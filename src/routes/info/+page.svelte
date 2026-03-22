@@ -175,18 +175,29 @@
 			Google Earth Pro does not include usable elevation data when exporting paths. Coordinates are typically stored as "clamped to ground" with an altitude of 0.
 		</p>
 		<p>
-			To calculate ascent and descent, the tool automatically fetches real elevation data from the <strong>Open-Elevation API</strong> — a free, open-source service based on SRTM elevation datasets with ~30 m resolution.
+			To calculate ascent and descent, the tool automatically fetches real elevation data from a third-party API. You can switch between two providers using the <strong>Elevation API</strong> toggle on the main page.
 		</p>
 
-		<h3>How It Works</h3>
+		<h3>Open-Elevation (default)</h3>
 		<ul>
-			<li>All track point coordinates are sent in a <strong>single POST request</strong> to the API</li>
-			<li>The API returns the terrain elevation for each point</li>
-			<li>If the request fails (e.g. server overloaded), it automatically <strong>retries up to 3 times</strong></li>
+			<li>Based on <strong>SRTM</strong> datasets with ~30 m resolution</li>
+			<li>All coordinates are sent in a <strong>single POST request</strong></li>
+			<li>Free and open-source, but may occasionally be down</li>
 		</ul>
 
+		<h3>Open-Meteo (fallback)</h3>
+		<ul>
+			<li>Based on <strong>Copernicus DEM</strong> with ~90 m resolution</li>
+			<li>Coordinates are sent in <strong>batched GET requests</strong> (50 points per batch, 1.5 s delay)</li>
+			<li>Free, no API key required</li>
+		</ul>
+
+		<p>
+			Both providers automatically <strong>retry up to 3 times</strong> if a request fails (e.g. rate limit or server error). If one API isn't working, switch to the other and try again.
+		</p>
+
 		<div class="tip">
-			The elevation lookup may take a few seconds depending on route length and API load. If it fails, simply try uploading your file again.
+			The elevation lookup may take a few seconds depending on route length and API load. Open-Meteo is generally more reliable; Open-Elevation offers higher resolution but may have downtime.
 		</div>
 	</section>
 

@@ -2,7 +2,7 @@
 	import { parseFile } from '$lib/gpx.js';
 	import { computeStages } from '$lib/calc.js';
 	import { stagesToCSV, downloadCSV } from '$lib/csv.js';
-	import { fetchElevation, hasElevationData } from '$lib/elevation.js';
+	import { fetchElevation, hasElevationData, PROVIDERS } from '$lib/elevation.js';
 	import { getAppState } from '$lib/store.svelte.js';
 
 	const app = getAppState();
@@ -21,7 +21,9 @@
 
 			if (!hasElevationData(track)) {
 				app.loadingMessage = `Fetching elevation data (${track.length} points)…`;
-				track = await fetchElevation(track);
+				track = await fetchElevation(track, app.elevationProvider, (batch, total) => {
+					app.loadingMessage = `Fetching elevation data (batch ${batch}/${total})…`;
+				});
 			}
 
 			app.currentTrack = track;
@@ -120,6 +122,20 @@
 			onchange={handleFileUpload}
 		/>
 	</label>
+
+	<div class="api-toggle">
+		<span class="api-toggle-label">Elevation API</span>
+		{#each Object.entries(PROVIDERS) as [key, provider]}
+			<button
+				class="api-toggle-btn"
+				class:api-toggle-btn--active={app.elevationProvider === key}
+				onclick={() => app.elevationProvider = key}
+				disabled={app.loading}
+			>
+				{provider.name}
+			</button>
+		{/each}
+	</div>
 
 	{#if app.error}
 		<div class="error" role="alert">
@@ -231,7 +247,7 @@
 	}
 
 	h1 {
-		font-size: 1.6rem;
+		font-size: 2rem;
 		font-weight: 800;
 		color: #D4719A;
 		margin: 0 0 0.2rem;
@@ -241,7 +257,7 @@
 	.subtitle {
 		color: rgba(210, 201, 160, 0.7);
 		margin: 0;
-		font-size: 0.95rem;
+		font-size: 1.1rem;
 		font-weight: 400;
 		letter-spacing: 0.01em;
 	}
@@ -256,7 +272,7 @@
 		color: #D4719A;
 		border: 1.5px solid rgba(212, 113, 154, 0.3);
 		border-radius: 9px;
-		font-size: 0.8rem;
+		font-size: 0.9rem;
 		font-weight: 600;
 		font-family: 'Karla', system-ui, sans-serif;
 		text-decoration: none;
@@ -334,7 +350,7 @@
 	}
 
 	.dropzone-text {
-		font-size: 0.9rem;
+		font-size: 1rem;
 		font-weight: 600;
 		color: #D2C9A0;
 	}
@@ -345,7 +361,7 @@
 	}
 
 	.dropzone-hint {
-		font-size: 0.75rem;
+		font-size: 0.85rem;
 		color: rgba(210, 201, 160, 0.3);
 		font-weight: 400;
 	}
@@ -368,6 +384,56 @@
 		to { transform: rotate(360deg); }
 	}
 
+	/* ── API Toggle ── */
+
+	.api-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.api-toggle-label {
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: rgba(210, 201, 160, 0.4);
+		margin-right: 0.25rem;
+	}
+
+	.api-toggle-btn {
+		padding: 0.3rem 0.7rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		font-family: 'Karla', system-ui, sans-serif;
+		color: rgba(210, 201, 160, 0.45);
+		background: transparent;
+		border: 1.5px solid rgba(210, 201, 160, 0.1);
+		border-radius: 7px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.api-toggle-btn:hover:not(:disabled) {
+		color: rgba(210, 201, 160, 0.7);
+		border-color: rgba(210, 201, 160, 0.2);
+	}
+
+	.api-toggle-btn--active {
+		color: #FAAD17;
+		border-color: rgba(250, 173, 23, 0.35);
+		background: rgba(250, 173, 23, 0.06);
+	}
+
+	.api-toggle-btn--active:hover:not(:disabled) {
+		color: #FAAD17;
+		border-color: rgba(250, 173, 23, 0.5);
+	}
+
+	.api-toggle-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
 	/* ── Error ── */
 
 	.error {
@@ -379,7 +445,7 @@
 		border-radius: 12px;
 		padding: 0.85rem 1rem;
 		margin-bottom: 1.25rem;
-		font-size: 0.82rem;
+		font-size: 0.95rem;
 		line-height: 1.45;
 	}
 
@@ -417,7 +483,7 @@
 	}
 
 	h2 {
-		font-size: 1rem;
+		font-size: 1.35rem;
 		font-weight: 700;
 		color: #D2C9A0;
 		margin: 0;
@@ -430,14 +496,14 @@
 		flex-wrap: wrap;
 		gap: 0.3rem;
 		margin-bottom: 0.85rem;
-		font-size: 0.8rem;
+		font-size: 0.9rem;
 		color: rgba(210, 201, 160, 0.5);
 	}
 
 	.formula-label {
 		font-weight: 700;
 		color: #FAAD17;
-		font-size: 0.82rem;
+		font-size: 0.92rem;
 	}
 
 	.formula-eq {
@@ -463,7 +529,7 @@
 		border: none;
 		border-bottom: 1.5px solid rgba(210, 201, 160, 0.2);
 		border-radius: 0;
-		font-size: 0.82rem;
+		font-size: 0.92rem;
 		font-family: 'Karla', system-ui, sans-serif;
 		font-weight: 700;
 		text-align: center;
@@ -494,7 +560,7 @@
 		border: 1px solid rgba(210, 201, 160, 0.12);
 		border-radius: 6px;
 		color: rgba(210, 201, 160, 0.4);
-		font-size: 0.68rem;
+		font-size: 0.78rem;
 		font-family: 'Karla', system-ui, sans-serif;
 		font-weight: 600;
 		padding: 0.2rem 0.5rem;
@@ -527,7 +593,7 @@
 		padding: 0.6rem 0.85rem;
 		text-align: left;
 		font-weight: 600;
-		font-size: 0.7rem;
+		font-size: 0.8rem;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
@@ -535,7 +601,7 @@
 	td {
 		padding: 0.55rem 0.85rem;
 		border-bottom: 1px solid rgba(210, 201, 160, 0.05);
-		font-size: 0.85rem;
+		font-size: 0.95rem;
 		color: rgba(210, 201, 160, 0.8);
 	}
 
@@ -589,7 +655,7 @@
 		color: #D4719A;
 		border: 1.5px solid rgba(212, 113, 154, 0.3);
 		border-radius: 9px;
-		font-size: 0.8rem;
+		font-size: 0.9rem;
 		font-weight: 600;
 		font-family: 'Karla', system-ui, sans-serif;
 		cursor: pointer;

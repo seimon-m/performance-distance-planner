@@ -1,4 +1,5 @@
 import { DEFAULT_ASCENT_DIVISOR, DEFAULT_DESCENT_DIVISOR } from './calc.js';
+import { DEFAULT_PROVIDER } from './elevation.js';
 
 let stages = $state([]);
 let error = $state('');
@@ -10,6 +11,7 @@ let descentDivisor = $state(DEFAULT_DESCENT_DIVISOR);
 let currentTrack = $state(null);
 let currentWaypoints = $state(null);
 let dragging = $state(false);
+let elevationProvider = $state(DEFAULT_PROVIDER);
 
 export function getAppState() {
 	return {
@@ -33,5 +35,7 @@ export function getAppState() {
 		set currentWaypoints(v) { currentWaypoints = v; },
 		get dragging() { return dragging; },
 		set dragging(v) { dragging = v; },
+		get elevationProvider() { return elevationProvider; },
+		set elevationProvider(v) { elevationProvider = v; },
 	};
 }
