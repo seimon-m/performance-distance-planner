@@ -10,7 +10,8 @@ A client-side web tool that parses GPX/KML files, splits routes into daily stage
 - **Stage calculation** — distance (km), ascent (hm ↑), descent (hm ↓), performance distance (Lkm)
 - **Waypoint filtering** — recognizes stage waypoints (e.g. `T01.1`, `T01.3a`), ignores other types
 - **Variant selection** — picks the preferred overnight option when multiple exist (no suffix > a > b > c)
-- **Elevation lookup** — automatic via [Open-Elevation API](https://open-elevation.com) with retry logic
+- **Elevation lookup** — switchable between [Open-Elevation](https://open-elevation.com) and [Open-Meteo](https://open-meteo.com), with auto-retry
+- **API toggle** — switch elevation provider on the fly; auto-refetches when a file is loaded
 - **Adjustable formula** — configurable ascent/descent divisors for the Lkm calculation
 - **CSV export** — download stage data for spreadsheets
 - **Info page** — built-in guide explaining route planning and calculations
@@ -44,7 +45,14 @@ Only **T-waypoints** are used for stage splitting. All other types are ignored.
 
 ## Elevation Data
 
-Google Earth Pro does not export usable elevation for paths. The tool fetches terrain elevation from the [Open-Elevation API](https://open-elevation.com) (free, no API key, SRTM ~30 m resolution). All coordinates are sent in a single POST request with automatic retry on failure.
+Google Earth Pro does not export usable elevation for paths. The tool fetches terrain elevation from one of two free APIs, selectable via a toggle:
+
+| Provider | Resolution | Method | Notes |
+|----------|-----------|--------|-------|
+| **Open-Elevation** (default) | SRTM ~30 m | Single POST | Fast, but may have downtime |
+| **Open-Meteo** (fallback) | Copernicus ~90 m | Batched GET (50 pts, 3 s delay) | Reliable, slower for large routes |
+
+Both providers retry automatically on failure. Switching APIs with a file loaded triggers an automatic re-fetch.
 
 ## Architecture
 
@@ -53,7 +61,7 @@ src/
 ├── lib/
 │   ├── gpx.js            — GPX/KML parsing, waypoint filtering, variant selection
 │   ├── calc.js           — Stage splitting, distance/ascent/descent, Lkm calculation
-│   ├── elevation.js      — Open-Elevation API with retry logic
+│   ├── elevation.js      — Elevation API (Open-Elevation + Open-Meteo, switchable)
 │   ├── csv.js            — CSV generation and download
 │   ├── store.svelte.js   — Shared state (persists across navigation)
 │   ├── gpx.test.js       — Tests: parsing, waypoint filtering, variants
@@ -71,7 +79,7 @@ src/
 ```
 File Upload → parseFile() → extractTrack() + extractWaypoints()
   → filterStageWaypoints()   (T-prefix only, preferred variant)
-  → fetchElevation()         (if no elevation data present)
+  → fetchElevation()         (if no elevation data; uses selected API)
   → computeStages()          (split track, calculate per stage)
   → Results table / CSV export
 ```
@@ -81,7 +89,7 @@ File Upload → parseFile() → extractTrack() + extractWaypoints()
 - **SvelteKit** (Svelte 5) — client-only, static adapter, no SSR
 - **@tmcw/togeojson** — GPX/KML → GeoJSON conversion
 - **geolib** — geodesic distance calculation
-- **Open-Elevation API** — elevation data (free, no API key)
+- **Open-Elevation API** / **Open-Meteo API** — elevation data (free, no API key)
 - **Vitest** — unit tests
 
 ## Setup
