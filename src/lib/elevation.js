@@ -7,7 +7,8 @@ export const DEFAULT_PROVIDER = 'open-elevation';
 
 const MAX_RETRIES = 3;
 const OPEN_METEO_BATCH_SIZE = 50;
-const OPEN_METEO_BATCH_DELAY = 1500;
+const OPEN_METEO_BATCH_DELAY = 3000;
+const OPEN_METEO_MAX_RETRIES = 5;
 
 /**
  * Fetch elevation data using the selected provider.
@@ -80,7 +81,7 @@ async function fetchOpenMeteo(track, onProgress) {
 		if (onProgress) onProgress(batchNum, totalBatches);
 
 		const batch = track.slice(i, i + OPEN_METEO_BATCH_SIZE);
-		const elevations = await fetchOpenMeteoBatch(batch);
+		const elevations = await fetchOpenMeteoBatch(batch, batchNum, totalBatches, onProgress);
 		allElevations.push(...elevations);
 	}
 
@@ -89,27 +90,31 @@ async function fetchOpenMeteo(track, onProgress) {
 
 // ── Open-Meteo batch (GET, 50 points/req) ──
 
-async function fetchOpenMeteoBatch(batch) {
+async function fetchOpenMeteoBatch(batch, batchNum, totalBatches, onProgress) {
 	const latitudes = batch.map((p) => Math.round(p[1] * 10000) / 10000).join(',');
 	const longitudes = batch.map((p) => Math.round(p[0] * 10000) / 10000).join(',');
 	const url = `https://api.open-meteo.com/v1/elevation?latitude=${latitudes}&longitude=${longitudes}`;
 
-	for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-		if (attempt > 0) await delay(3000);
+	for (let attempt = 0; attempt <= OPEN_METEO_MAX_RETRIES; attempt++) {
+		if (attempt > 0) {
+			const backoff = Math.min(10000 * Math.pow(2, attempt - 1), 60000);
+			if (onProgress) onProgress(batchNum, totalBatches, `retry ${attempt}/${OPEN_METEO_MAX_RETRIES}, waiting ${Math.round(backoff / 1000)}s`);
+			await delay(backoff);
+		}
 
 		let response;
 		try {
 			response = await fetch(url);
 		} catch (err) {
-			if (attempt === MAX_RETRIES) {
+			if (attempt === OPEN_METEO_MAX_RETRIES) {
 				throw new Error('Could not reach Open-Meteo. Try a different API.');
 			}
 			continue;
 		}
 
 		if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
-			if (attempt === MAX_RETRIES) {
-				throw new Error('Open-Meteo is overloaded. Try a different API.');
+			if (attempt === OPEN_METEO_MAX_RETRIES) {
+				throw new Error('Open-Meteo rate limit exceeded. Try a different API.');
 			}
 			continue;
 		}

@@ -9,6 +9,7 @@ let loadingMessage = $state('');
 let ascentDivisor = $state(DEFAULT_ASCENT_DIVISOR);
 let descentDivisor = $state(DEFAULT_DESCENT_DIVISOR);
 let currentTrack = $state(null);
+let currentRawTrack = $state(null);
 let currentWaypoints = $state(null);
 let dragging = $state(false);
 let elevationProvider = $state(DEFAULT_PROVIDER);
@@ -31,6 +32,8 @@ export function getAppState() {
 		set descentDivisor(v) { descentDivisor = v; },
 		get currentTrack() { return currentTrack; },
 		set currentTrack(v) { currentTrack = v; },
+		get currentRawTrack() { return currentRawTrack; },
+		set currentRawTrack(v) { currentRawTrack = v; },
 		get currentWaypoints() { return currentWaypoints; },
 		set currentWaypoints(v) { currentWaypoints = v; },
 		get dragging() { return dragging; },

@@ -19,18 +19,48 @@
 			const text = await file.text();
 			let { track, waypoints } = parseFile(text, file.name);
 
+			app.currentRawTrack = track;
+			app.currentWaypoints = waypoints;
+
 			if (!hasElevationData(track)) {
 				app.loadingMessage = `Fetching elevation data (${track.length} points)…`;
-				track = await fetchElevation(track, app.elevationProvider, (batch, total) => {
-					app.loadingMessage = `Fetching elevation data (batch ${batch}/${total})…`;
+				track = await fetchElevation(track, app.elevationProvider, (batch, total, status) => {
+					app.loadingMessage = status
+						? `Elevation batch ${batch}/${total} — ${status}…`
+						: `Fetching elevation data (batch ${batch}/${total})…`;
 				});
 			}
 
 			app.currentTrack = track;
-			app.currentWaypoints = waypoints;
 			app.stages = computeStages(track, waypoints, app.ascentDivisor, app.descentDivisor);
 		} catch (err) {
 			app.error = err.message || 'Error processing file.';
+			app.stages = [];
+		} finally {
+			app.loading = false;
+			app.loadingMessage = '';
+		}
+	}
+
+	async function refetchElevation(provider) {
+		if (!app.currentRawTrack || !app.currentWaypoints) return;
+		app.elevationProvider = provider;
+		app.error = '';
+		app.loading = true;
+
+		try {
+			const raw = app.currentRawTrack;
+			app.loadingMessage = `Fetching elevation data (${raw.length} points)…`;
+			const track = await fetchElevation(raw, provider, (batch, total, status) => {
+				app.loadingMessage = status
+					? `Elevation batch ${batch}/${total} — ${status}…`
+					: `Fetching elevation data (batch ${batch}/${total})…`;
+			});
+
+			app.currentTrack = track;
+			app.stages = computeStages(track, app.currentWaypoints, app.ascentDivisor, app.descentDivisor);
+		} catch (err) {
+			app.error = err.message || 'Error fetching elevation data.';
 			app.stages = [];
 		} finally {
 			app.loading = false;
@@ -129,8 +159,8 @@
 			<button
 				class="api-toggle-btn"
 				class:api-toggle-btn--active={app.elevationProvider === key}
-				onclick={() => app.elevationProvider = key}
-				disabled={app.loading}
+				onclick={() => app.currentRawTrack ? refetchElevation(key) : app.elevationProvider = key}
+				disabled={app.loading || app.elevationProvider === key}
 			>
 				{provider.name}
 			</button>
