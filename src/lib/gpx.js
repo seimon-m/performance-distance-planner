@@ -129,9 +129,10 @@ export function extractWaypoints(geojson) {
 /**
  * Regex to match stage waypoint names.
  * Pattern: Prefix (letters + digits) + dot + stage number + optional variant letter
- * Examples: T10.1, T10.3a, T10.4b, T5.12c
+ * Variant may be separated by underscore, and can be upper or lowercase.
+ * Examples: T10.1, T10.3a, T10.4b, T04.3_A, T04.8_B
  */
-const STAGE_WAYPOINT_REGEX = /^([A-Za-z]+\d+)\.(\d+)([a-z])?$/;
+const STAGE_WAYPOINT_REGEX = /^([A-Za-z]+\d+)\.(\d+)(?:[_]?([a-zA-Z]))?$/;
 
 /**
  * Filter waypoints to only include stage/overnight waypoints.
@@ -157,7 +158,7 @@ export function filterStageWaypoints(waypoints) {
 				...wp,
 				prefix: match[1],
 				stageNum: parseInt(match[2], 10),
-				variant: match[3] || '' // empty string = no variant letter
+				variant: (match[3] || '').toLowerCase() // normalized lowercase, empty = no variant
 			});
 		}
 	}

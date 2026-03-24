@@ -131,6 +131,40 @@ describe('filterStageWaypoints', () => {
 		expect(result).toHaveLength(2);
 	});
 
+	it('matches underscore+uppercase variants (T04.3_A style)', () => {
+		const waypoints = [
+			{ name: 'T04.1', lon: 21.0, lat: 39.0 },
+			{ name: 'T04.2', lon: 21.1, lat: 39.1 },
+			{ name: 'T04.3_A', lon: 21.2, lat: 39.2 },
+			{ name: 'T04.3_B', lon: 21.3, lat: 39.3 },
+			{ name: 'T04.4', lon: 21.4, lat: 39.4 },
+			{ name: 'T04.5_A', lon: 21.5, lat: 39.5 },
+			{ name: 'T04.5_B', lon: 21.6, lat: 39.6 },
+			{ name: 'T04.6', lon: 21.7, lat: 39.7 },
+			{ name: 'T04.7', lon: 21.8, lat: 39.8 },
+			{ name: 'T04.8_A', lon: 21.9, lat: 39.9 }
+		];
+
+		const result = filterStageWaypoints(waypoints);
+		const names = result.map((r) => r.name);
+		expect(names).toEqual([
+			'T04.1', 'T04.2', 'T04.3_A', 'T04.4', 'T04.5_A',
+			'T04.6', 'T04.7', 'T04.8_A'
+		]);
+	});
+
+	it('prefers no-variant over underscore+uppercase variant', () => {
+		const waypoints = [
+			{ name: 'T04.3', lon: 21.0, lat: 39.0 },
+			{ name: 'T04.3_A', lon: 21.1, lat: 39.1 },
+			{ name: 'T04.3_B', lon: 21.2, lat: 39.2 }
+		];
+
+		const result = filterStageWaypoints(waypoints);
+		expect(result).toHaveLength(1);
+		expect(result[0].name).toBe('T04.3');
+	});
+
 	it('handles complex real-world mix of waypoints', () => {
 		const waypoints = [
 			{ name: 'Stournareika', lon: 21.48, lat: 39.45 },
