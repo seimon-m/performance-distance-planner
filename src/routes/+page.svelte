@@ -180,7 +180,8 @@
 	{#if app.stages.length > 0}
 		<div class="results">
 			<div class="results-header">
-				<h2>{app.stages.length} Stages</h2>
+				<h2>{app.stages.length} {app.stages.length === 1 ? 'Stage' : 'Stages'}</h2>
+				<span class="track-points">{app.currentTrack.length} track points</span>
 			</div>
 
 			<div class="formula-bar">

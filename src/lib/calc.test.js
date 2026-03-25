@@ -184,6 +184,26 @@ describe('calculateStages', () => {
 });
 
 describe('computeStages (integration)', () => {
+	it('produces a single stage when no waypoints are provided', () => {
+		const track = [
+			[8.0, 47.0, 500],
+			[8.01, 47.0, 520],
+			[8.02, 47.0, 540],
+			[8.03, 47.0, 530],
+			[8.04, 47.0, 560]
+		];
+
+		const stages = computeStages(track, []);
+
+		expect(stages.length).toBe(1);
+		expect(stages[0].day).toBe(1);
+		expect(stages[0].distance).toBeGreaterThan(0);
+		expect(stages[0].ascent).toBe(70); // 20+20+30
+		expect(stages[0].descent).toBe(10);
+		expect(stages[0].snapDistance).toBeNull();
+		expect(stages[0].pointDensity).toBeGreaterThan(0);
+	});
+
 	it('sorts waypoints and computes stages end-to-end', () => {
 		const track = [
 			[8.0, 47.0, 500],

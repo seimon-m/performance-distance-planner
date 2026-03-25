@@ -167,6 +167,9 @@
 		<p>
 			Save your route from Google Earth Pro as a <strong>KML</strong> or <strong>GPX</strong> file, then drag it into the planner or click to browse. Both formats work equally well.
 		</p>
+		<div class="tip">
+			Waypoints are optional. If your file only contains a track (no waypoints), the entire route is analyzed as a single stage — you still get distance, ascent, descent, Lkm, and density.
+		</div>
 	</section>
 
 	<section>

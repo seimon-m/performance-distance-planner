@@ -80,12 +80,9 @@ function extractFromGeoJSON(geojson) {
 		throw new Error('No track found in file.');
 	}
 
-	if (allWaypoints.length === 0) {
-		throw new Error('No waypoints found in file.');
-	}
-
 	// Filter to stage waypoints only, picking preferred variants
-	const waypoints = filterStageWaypoints(allWaypoints);
+	// If no waypoints exist, the entire track becomes a single stage
+	const waypoints = allWaypoints.length > 0 ? filterStageWaypoints(allWaypoints) : [];
 
 	return { track, waypoints };
 }

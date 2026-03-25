@@ -7,6 +7,7 @@ A client-side web tool that parses GPX/KML files, splits routes into daily stage
 ## Features
 
 - **GPX & KML upload** — drag-and-drop or click to browse, auto-detected by file extension
+- **Track-only analysis** — files without waypoints are treated as a single stage with all metrics
 - **Stage calculation** — distance (km), ascent (hm ↑), descent (hm ↓), performance distance (Lkm)
 - **Waypoint filtering** — recognizes stage waypoints (e.g. `T01.1`, `T01.3a`), ignores other types
 - **Variant selection** — picks the preferred overnight option when multiple exist (no suffix > a > b > c)
@@ -47,6 +48,7 @@ Only **T-waypoints** are used for stage splitting. All other types are ignored.
 
 Each T-waypoint is **snapped to the nearest point on the track** (by geodesic distance). The route is then split at those track points, creating one stage between each consecutive pair.
 
+- If the file contains **no waypoints**, the entire track is treated as a single stage
 - Waypoints don't need to sit exactly on the route — they can be up to a few hundred meters off
 - The waypoint's own position is **only used to determine where to split** the track
 - All distance and elevation measurements follow the actual track line
