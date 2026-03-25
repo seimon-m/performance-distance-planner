@@ -38,7 +38,7 @@ export function sortWaypointsAlongTrack(waypoints, track) {
 			}
 		}
 
-		return { ...wp, trackIndex: bestIndex };
+		return { ...wp, trackIndex: bestIndex, snapDistance: minDist };
 	});
 
 	sorted.sort((a, b) => a.trackIndex - b.trackIndex);
@@ -63,13 +63,15 @@ export function sortWaypointsAlongTrack(waypoints, track) {
  * @returns {Array<{ day: number, distance: number, ascent: number, performanceKm: number }>}
  */
 export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_ASCENT_DIVISOR, descentDivisor = DEFAULT_DESCENT_DIVISOR) {
-	// Build a Set of track indices where stages should be split
-	const splitIndices = new Set(sortedWaypoints.map((wp) => wp.trackIndex));
+	// Build a map from track index to snap distance (meters)
+	const snapMap = new Map(sortedWaypoints.map((wp) => [wp.trackIndex, wp.snapDistance]));
+	const splitIndices = new Set(snapMap.keys());
 
 	const stages = [];
 	let stageDistance = 0; // in meters
 	let stageAscent = 0; // in meters
 	let stageDescent = 0; // in meters
+	let stageSegments = 0; // number of point-to-point segments
 	let dayNumber = 1;
 
 	for (let i = 1; i < track.length; i++) {
@@ -82,6 +84,7 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 			{ latitude: curr[1], longitude: curr[0] }
 		);
 		stageDistance += segmentDist;
+		stageSegments++;
 
 		// Accumulate elevation gain and loss
 		const prevEle = prev[2] ?? 0;
@@ -95,17 +98,21 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 
 		// If we reached a split point, close the current stage
 		if (splitIndices.has(i)) {
-			stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor));
+			const snap = Math.round(snapMap.get(i));
+			const density = stageSegments > 0 ? Math.round(stageDistance / stageSegments) : 0;
+			stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, snap, density));
 			dayNumber++;
 			stageDistance = 0;
 			stageAscent = 0;
 			stageDescent = 0;
+			stageSegments = 0;
 		}
 	}
 
-	// Final stage: from last split to end of track
+	// Final stage: from last split to end of track (no waypoint snap for the end)
 	if (stageDistance > 0 || stageAscent > 0 || stageDescent > 0) {
-		stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor));
+		const density = stageSegments > 0 ? Math.round(stageDistance / stageSegments) : 0;
+		stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, null, density));
 	}
 
 	return stages;
@@ -125,7 +132,7 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
  * @param {number} [descentDivisor=150] - Meters of descent per 1 Lkm
  * @returns {{ day: number, distance: number, ascent: number, descent: number, performanceKm: number }}
  */
-export function buildStage(day, distanceMeters, ascentMeters, descentMeters, ascentDivisor = DEFAULT_ASCENT_DIVISOR, descentDivisor = DEFAULT_DESCENT_DIVISOR) {
+export function buildStage(day, distanceMeters, ascentMeters, descentMeters, ascentDivisor = DEFAULT_ASCENT_DIVISOR, descentDivisor = DEFAULT_DESCENT_DIVISOR, snapDistance = null, pointDensity = null) {
 	const distanceKm = distanceMeters / 1000;
 	const descentContribution = descentDivisor > 0 ? descentMeters / descentDivisor : 0;
 	const performanceKm = distanceKm + ascentMeters / ascentDivisor + descentContribution;
@@ -135,7 +142,9 @@ export function buildStage(day, distanceMeters, ascentMeters, descentMeters, asc
 		distance: Math.round(distanceKm * 100) / 100, // 2 decimal places
 		ascent: Math.round(ascentMeters), // whole meters
 		descent: Math.round(descentMeters), // whole meters
-		performanceKm: Math.round(performanceKm * 100) / 100 // 2 decimal places
+		performanceKm: Math.round(performanceKm * 100) / 100, // 2 decimal places
+		snapDistance, // meters from waypoint to nearest track point, null for final stage
+		pointDensity // average meters between consecutive track points in this stage
 	};
 }
 

@@ -206,12 +206,35 @@
 		<p>
 			The tool finds each <strong>T-waypoint</strong> (stage endpoint), matches it to the <strong>nearest point on the track</strong>, and splits the route at those points. Your waypoints don't need to be placed exactly on the track — they can be up to a few hundred meters off and it will still work.
 		</p>
-		<p>For each stage, the following values are calculated:</p>
+
+		<h3>Snapping Algorithm</h3>
+		<ol>
+			<li>For each T-waypoint, the tool calculates the geodesic distance to <strong>every point on the track</strong> and picks the closest one.</li>
+			<li>The waypoints are then <strong>sorted by their position along the track</strong> (by track point index).</li>
+			<li>The track is <strong>split at those track points</strong>, creating one stage between each pair of consecutive split points.</li>
+		</ol>
+
+		<div class="tip">
+			The waypoint's own position is never used for distance or elevation — it only determines <strong>where to split</strong> the track. All measurements follow the actual track line, so off-track waypoints don't affect accuracy.
+		</div>
+
+		<h3>Per-Stage Measurements</h3>
+		<p>For each stage, the following values are calculated by walking along the track points:</p>
 		<ul>
 			<li><strong>Distance (km)</strong> — the geodesic (real-world) distance along the track, accounting for the curvature of the Earth</li>
 			<li><strong>Ascent (hm ↑)</strong> — total meters of elevation gained (only uphill sections count)</li>
 			<li><strong>Descent (hm ↓)</strong> — total meters of elevation lost (only downhill sections count)</li>
 		</ul>
+
+		<h3>Quality Indicators</h3>
+		<p>The results table includes two quality columns to help you judge the reliability of each stage's data. Click the <strong>ⓘ</strong> icon in each column header for details.</p>
+		<ul>
+			<li><strong>Snap</strong> — how far the stage endpoint waypoint was from the nearest track point (in meters). A large snap distance means the waypoint was placed far from the route, so the stage boundary may be slightly off.</li>
+			<li><strong>Density</strong> — the average spacing between consecutive track points in that stage. Denser tracks produce more accurate distance and elevation measurements; sparse tracks may cut corners.</li>
+		</ul>
+		<div class="tip">
+			Both indicators use a traffic-light system: <strong>green</strong> = good, <strong>yellow</strong> = acceptable, <strong>red</strong> = review recommended.
+		</div>
 	</section>
 
 	<section>

@@ -113,6 +113,9 @@
 	let totalPerformanceKm = $derived(
 		app.stages.reduce((sum, s) => sum + s.performanceKm, 0)
 	);
+
+	let snapTooltipOpen = $state(false);
+	let densityTooltipOpen = $state(false);
 </script>
 
 <main>
@@ -217,6 +220,38 @@
 							<th class="num">km</th>
 							<th class="num">hm ↑</th>
 							<th class="num">hm ↓</th>
+							<th class="num snap-col">
+								<span class="snap-header">
+									Snap
+									<button class="snap-info-btn" onclick={() => snapTooltipOpen = !snapTooltipOpen} aria-label="Snap info">
+										ⓘ
+									</button>
+								</span>
+								{#if snapTooltipOpen}
+									<div class="snap-tooltip">
+										Distance from waypoint to nearest track point.
+										<br /><span class="snap-dot snap-green"></span> ≤ 100 m — precise
+										<br /><span class="snap-dot snap-yellow"></span> ≤ 400 m — acceptable
+										<br /><span class="snap-dot snap-red"></span> > 400 m — check placement
+									</div>
+								{/if}
+							</th>
+							<th class="num snap-col">
+								<span class="snap-header">
+									Density
+									<button class="snap-info-btn" onclick={() => densityTooltipOpen = !densityTooltipOpen} aria-label="Density info">
+										ⓘ
+									</button>
+								</span>
+								{#if densityTooltipOpen}
+									<div class="snap-tooltip">
+										Avg. distance between consecutive track points.
+										<br /><span class="snap-dot snap-green"></span> ≤ 50 m — dense, accurate
+										<br /><span class="snap-dot snap-yellow"></span> ≤ 150 m — moderate
+										<br /><span class="snap-dot snap-red"></span> > 150 m — sparse, less accurate
+									</div>
+								{/if}
+							</th>
 							<th class="num">Lkm</th>
 						</tr>
 					</thead>
@@ -227,6 +262,32 @@
 								<td class="num">{stage.distance.toFixed(1)}</td>
 								<td class="num">{stage.ascent}</td>
 								<td class="num">{stage.descent}</td>
+								<td class="num snap-cell">
+									{#if stage.snapDistance != null}
+										<span
+											class="snap-dot"
+											class:snap-green={stage.snapDistance <= 100}
+											class:snap-yellow={stage.snapDistance > 100 && stage.snapDistance <= 400}
+											class:snap-red={stage.snapDistance > 400}
+										></span>
+										<span class="snap-val">{stage.snapDistance}m</span>
+									{:else}
+										<span class="snap-na">—</span>
+									{/if}
+								</td>
+								<td class="num snap-cell">
+									{#if stage.pointDensity != null}
+										<span
+											class="snap-dot"
+											class:snap-green={stage.pointDensity <= 50}
+											class:snap-yellow={stage.pointDensity > 50 && stage.pointDensity <= 150}
+											class:snap-red={stage.pointDensity > 150}
+										></span>
+										<span class="snap-val">{stage.pointDensity}m</span>
+									{:else}
+										<span class="snap-na">—</span>
+									{/if}
+								</td>
 								<td class="num lkm">{stage.performanceKm.toFixed(1)}</td>
 							</tr>
 						{/each}
@@ -237,6 +298,8 @@
 							<td class="num">{totalDistance.toFixed(1)}</td>
 							<td class="num">{totalAscent}</td>
 							<td class="num">{totalDescent}</td>
+							<td class="num snap-cell"></td>
+							<td class="num snap-cell"></td>
 							<td class="num lkm">{totalPerformanceKm.toFixed(1)}</td>
 						</tr>
 					</tfoot>
@@ -671,6 +734,82 @@
 
 	tfoot .lkm {
 		color: #FAAD17;
+	}
+
+	/* ── Snap indicator ── */
+
+	.snap-col {
+		position: relative;
+	}
+
+	.snap-header {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
+	.snap-info-btn {
+		background: none;
+		border: none;
+		color: rgba(210, 201, 160, 0.4);
+		font-size: 0.85rem;
+		cursor: pointer;
+		padding: 0;
+		line-height: 1;
+		transition: color 0.15s;
+	}
+
+	.snap-info-btn:hover {
+		color: #D4719A;
+	}
+
+	.snap-tooltip {
+		position: absolute;
+		right: 0;
+		top: 100%;
+		z-index: 10;
+		background: #1a3a2a;
+		border: 1px solid rgba(210, 201, 160, 0.15);
+		border-radius: 8px;
+		padding: 0.6rem 0.8rem;
+		font-size: 0.75rem;
+		font-weight: 400;
+		text-transform: none;
+		letter-spacing: 0;
+		line-height: 1.6;
+		color: rgba(210, 201, 160, 0.7);
+		white-space: nowrap;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+	}
+
+	.snap-cell {
+		white-space: nowrap;
+	}
+
+	.snap-cell .snap-dot {
+		margin-right: 0.25rem;
+	}
+
+	.snap-dot {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		vertical-align: middle;
+	}
+
+	.snap-green { background: #4ade80; }
+	.snap-yellow { background: #facc15; }
+	.snap-red { background: #f87171; }
+
+	.snap-val {
+		font-size: 0.75rem;
+		color: rgba(210, 201, 160, 0.45);
+		vertical-align: middle;
+	}
+
+	.snap-na {
+		color: rgba(210, 201, 160, 0.2);
 	}
 
 	/* ── Export button ── */

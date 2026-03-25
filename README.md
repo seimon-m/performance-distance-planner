@@ -43,6 +43,28 @@ Descent is optional (disabled by default). Both divisors are adjustable in the U
 
 Only **T-waypoints** are used for stage splitting. All other types are ignored.
 
+## Stage Calculation
+
+Each T-waypoint is **snapped to the nearest point on the track** (by geodesic distance). The route is then split at those track points, creating one stage between each consecutive pair.
+
+- Waypoints don't need to sit exactly on the route — they can be up to a few hundred meters off
+- The waypoint's own position is **only used to determine where to split** the track
+- All distance and elevation measurements follow the actual track line
+- Distance = sum of geodesic segments between consecutive track points
+- Ascent/descent = sum of positive/negative elevation differences along those points
+
+### Quality Indicators
+
+Each stage includes two quality metrics (traffic-light: green/yellow/red):
+
+| Indicator | What it measures | Green | Yellow | Red |
+|-----------|-----------------|-------|--------|-----|
+| **Snap** | Distance from waypoint to nearest track point | ≤ 100 m | ≤ 400 m | > 400 m |
+| **Density** | Avg. spacing between consecutive track points | ≤ 50 m | ≤ 150 m | > 150 m |
+
+- **Snap** — a large value means the stage boundary may be slightly off because the waypoint was far from the route
+- **Density** — sparse tracks cut corners, reducing distance/elevation accuracy
+
 ## Elevation Data
 
 Google Earth Pro does not export usable elevation for paths. The tool fetches terrain elevation from one of two free APIs, selectable via a toggle:
