@@ -38,7 +38,7 @@ export function sortWaypointsAlongTrack(waypoints, track) {
 			}
 		}
 
-		return { ...wp, trackIndex: bestIndex, snapDistance: minDist };
+		return { ...wp, trackIndex: bestIndex };
 	});
 
 	sorted.sort((a, b) => a.trackIndex - b.trackIndex);
@@ -63,9 +63,7 @@ export function sortWaypointsAlongTrack(waypoints, track) {
  * @returns {Array<{ day: number, distance: number, ascent: number, performanceKm: number }>}
  */
 export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_ASCENT_DIVISOR, descentDivisor = DEFAULT_DESCENT_DIVISOR) {
-	// Build a map from track index to snap distance (meters)
-	const snapMap = new Map(sortedWaypoints.map((wp) => [wp.trackIndex, wp.snapDistance]));
-	const splitIndices = new Set(snapMap.keys());
+	const splitIndices = new Set(sortedWaypoints.map((wp) => wp.trackIndex));
 
 	const stages = [];
 	let stageDistance = 0; // in meters
@@ -98,9 +96,8 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 
 		// If we reached a split point, close the current stage
 		if (splitIndices.has(i)) {
-			const snap = Math.round(snapMap.get(i));
 			const density = stageSegments > 0 ? Math.round(stageDistance / stageSegments) : 0;
-			stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, snap, density));
+			stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, density));
 			dayNumber++;
 			stageDistance = 0;
 			stageAscent = 0;
@@ -109,10 +106,10 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 		}
 	}
 
-	// Final stage: from last split to end of track (no waypoint snap for the end)
+	// Final stage: from last split to end of track
 	if (stageDistance > 0 || stageAscent > 0 || stageDescent > 0) {
 		const density = stageSegments > 0 ? Math.round(stageDistance / stageSegments) : 0;
-		stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, null, density));
+		stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, density));
 	}
 
 	return stages;
@@ -132,7 +129,7 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
  * @param {number} [descentDivisor=150] - Meters of descent per 1 Lkm
  * @returns {{ day: number, distance: number, ascent: number, descent: number, performanceKm: number }}
  */
-export function buildStage(day, distanceMeters, ascentMeters, descentMeters, ascentDivisor = DEFAULT_ASCENT_DIVISOR, descentDivisor = DEFAULT_DESCENT_DIVISOR, snapDistance = null, pointDensity = null) {
+export function buildStage(day, distanceMeters, ascentMeters, descentMeters, ascentDivisor = DEFAULT_ASCENT_DIVISOR, descentDivisor = DEFAULT_DESCENT_DIVISOR, pointDensity = null) {
 	const distanceKm = distanceMeters / 1000;
 	const descentContribution = descentDivisor > 0 ? descentMeters / descentDivisor : 0;
 	const performanceKm = distanceKm + ascentMeters / ascentDivisor + descentContribution;
@@ -143,7 +140,6 @@ export function buildStage(day, distanceMeters, ascentMeters, descentMeters, asc
 		ascent: Math.round(ascentMeters), // whole meters
 		descent: Math.round(descentMeters), // whole meters
 		performanceKm: Math.round(performanceKm * 100) / 100, // 2 decimal places
-		snapDistance, // meters from waypoint to nearest track point, null for final stage
 		pointDensity // average meters between consecutive track points in this stage
 	};
 }

@@ -9,7 +9,12 @@ export function stagesToCSV(stages) {
 	const rows = stages.map(
 		(s) => `Day ${s.day},${s.distance},${s.ascent},${s.descent},${s.performanceKm}`
 	);
-	return [header, ...rows].join('\n');
+	const totalDist = Math.round(stages.reduce((sum, s) => sum + s.distance, 0) * 10) / 10;
+	const totalAscent = stages.reduce((sum, s) => sum + s.ascent, 0);
+	const totalDescent = stages.reduce((sum, s) => sum + s.descent, 0);
+	const totalLkm = Math.round(stages.reduce((sum, s) => sum + s.performanceKm, 0) * 10) / 10;
+	const totals = `Total,${totalDist},${totalAscent},${totalDescent},${totalLkm}`;
+	return [header, ...rows, totals].join('\n');
 }
 
 /**

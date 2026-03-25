@@ -117,7 +117,6 @@
 		app.stages.reduce((sum, s) => sum + s.performanceKm, 0)
 	);
 
-	let snapTooltipOpen = $state(false);
 	let densityTooltipOpen = $state(false);
 </script>
 
@@ -226,22 +225,6 @@
 							<th class="num">hm ↓</th>
 							<th class="num snap-col">
 								<span class="snap-header">
-									Snap
-									<button class="snap-info-btn" onclick={() => snapTooltipOpen = !snapTooltipOpen} aria-label="Snap info">
-										ⓘ
-									</button>
-								</span>
-								{#if snapTooltipOpen}
-									<div class="snap-tooltip">
-										Distance from waypoint to nearest track point.
-										<br /><span class="snap-dot snap-green"></span> ≤ 100 m — precise
-										<br /><span class="snap-dot snap-yellow"></span> ≤ 400 m — acceptable
-										<br /><span class="snap-dot snap-red"></span> > 400 m — check placement
-									</div>
-								{/if}
-							</th>
-							<th class="num snap-col">
-								<span class="snap-header">
 									Density
 									<button class="snap-info-btn" onclick={() => densityTooltipOpen = !densityTooltipOpen} aria-label="Density info">
 										ⓘ
@@ -267,19 +250,6 @@
 								<td class="num">{stage.ascent}</td>
 								<td class="num">{stage.descent}</td>
 								<td class="num snap-cell">
-									{#if stage.snapDistance != null}
-										<span
-											class="snap-dot"
-											class:snap-green={stage.snapDistance <= 100}
-											class:snap-yellow={stage.snapDistance > 100 && stage.snapDistance <= 400}
-											class:snap-red={stage.snapDistance > 400}
-										></span>
-										<span class="snap-val">{stage.snapDistance}m</span>
-									{:else}
-										<span class="snap-na">—</span>
-									{/if}
-								</td>
-								<td class="num snap-cell">
 									{#if stage.pointDensity != null}
 										<span
 											class="snap-dot"
@@ -302,7 +272,6 @@
 							<td class="num">{totalDistance.toFixed(1)}</td>
 							<td class="num">{totalAscent}</td>
 							<td class="num">{totalDescent}</td>
-							<td class="num snap-cell"></td>
 							<td class="num snap-cell"></td>
 							<td class="num lkm">{totalPerformanceKm.toFixed(1)}</td>
 						</tr>
@@ -337,7 +306,7 @@
 	}
 
 	main {
-		max-width: 620px;
+		max-width: 820px;
 		margin: 0 auto;
 		padding: 4rem 1.25rem 5rem;
 	}
@@ -464,7 +433,7 @@
 
 	.dropzone-hint {
 		font-size: 0.85rem;
-		color: rgba(210, 201, 160, 0.3);
+		color: rgba(210, 201, 160, 0.4);
 		font-weight: 400;
 	}
 
@@ -507,7 +476,7 @@
 		font-size: 0.82rem;
 		font-weight: 600;
 		font-family: 'Karla', system-ui, sans-serif;
-		color: rgba(210, 201, 160, 0.45);
+		color: rgba(210, 201, 160, 0.6);
 		background: transparent;
 		border: 1.5px solid rgba(210, 201, 160, 0.1);
 		border-radius: 7px;
@@ -615,7 +584,7 @@
 	}
 
 	.formula-eq {
-		color: rgba(210, 201, 160, 0.3);
+		color: rgba(210, 201, 160, 0.4);
 	}
 
 	.formula-part {
@@ -623,7 +592,7 @@
 	}
 
 	.formula-op {
-		color: rgba(210, 201, 160, 0.3);
+		color: rgba(210, 201, 160, 0.4);
 		padding: 0 0.05rem;
 	}
 
@@ -686,7 +655,7 @@
 
 	.table-wrap {
 		border-radius: 12px;
-		overflow: hidden;
+		overflow-x: auto;
 		border: 1px solid rgba(210, 201, 160, 0.08);
 	}
 
@@ -815,11 +784,11 @@
 
 	.snap-green { background: #4ade80; }
 	.snap-yellow { background: #facc15; }
-	.snap-red { background: #f87171; }
+	.snap-red { background: #ef5a5a; }
 
 	.snap-val {
 		font-size: 0.75rem;
-		color: rgba(210, 201, 160, 0.45);
+		color: rgba(210, 201, 160, 0.6);
 		vertical-align: middle;
 	}
 
@@ -866,16 +835,16 @@
 		padding: 1.5rem 0;
 		border-top: 1px solid rgba(210, 201, 160, 0.06);
 		font-size: 0.75rem;
-		color: rgba(210, 201, 160, 0.3);
+		color: rgba(210, 201, 160, 0.4);
 	}
 
 	.footer-logo {
-		width: 18px;
-		height: 18px;
+		width: 22px;
+		height: 22px;
 	}
 
 	footer a {
-		color: rgba(210, 201, 160, 0.45);
+		color: rgba(210, 201, 160, 0.6);
 		text-decoration: none;
 		transition: color 0.15s;
 	}

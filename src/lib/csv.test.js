@@ -14,14 +14,16 @@ describe('stagesToCSV', () => {
 		expect(lines[0]).toBe('Day,Distance (km),Ascent (m),Descent (m),Performance Distance (Lkm)');
 		expect(lines[1]).toBe('Day 1,12.34,456,320,16.9');
 		expect(lines[2]).toBe('Day 2,8.5,200,150,10.5');
-		expect(lines.length).toBe(3);
+		expect(lines[3]).toBe('Total,20.8,656,470,27.4');
+		expect(lines.length).toBe(4);
 	});
 
 	it('handles empty stages array', () => {
 		const csv = stagesToCSV([]);
 		const lines = csv.split('\n');
 
-		expect(lines.length).toBe(1); // header only
+		expect(lines.length).toBe(2); // header + totals
 		expect(lines[0]).toBe('Day,Distance (km),Ascent (m),Descent (m),Performance Distance (Lkm)');
+		expect(lines[1]).toBe('Total,0,0,0,0');
 	});
 });

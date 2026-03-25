@@ -229,14 +229,10 @@
 			<li><strong>Descent (hm ↓)</strong> — total meters of elevation lost (only downhill sections count)</li>
 		</ul>
 
-		<h3>Quality Indicators</h3>
-		<p>The results table includes two quality columns to help you judge the reliability of each stage's data. Click the <strong>ⓘ</strong> icon in each column header for details.</p>
-		<ul>
-			<li><strong>Snap</strong> — how far the stage endpoint waypoint was from the nearest track point (in meters). A large snap distance means the waypoint was placed far from the route, so the stage boundary may be slightly off.</li>
-			<li><strong>Density</strong> — the average spacing between consecutive track points in that stage. Denser tracks produce more accurate distance and elevation measurements; sparse tracks may cut corners.</li>
-		</ul>
+		<h3>Quality Indicator</h3>
+		<p>The results table includes a <strong>Density</strong> column showing the average spacing between consecutive track points in each stage. Denser tracks produce more accurate distance and elevation measurements; sparse tracks may cut corners. Click the <strong>ⓘ</strong> icon in the column header for threshold details.</p>
 		<div class="tip">
-			Both indicators use a traffic-light system: <strong>green</strong> = good, <strong>yellow</strong> = acceptable, <strong>red</strong> = review recommended.
+			The density indicator uses a traffic-light system: <strong>green</strong> (≤ 50 m) = dense, accurate — <strong>yellow</strong> (≤ 150 m) = moderate — <strong>red</strong> (> 150 m) = sparse, review recommended.
 		</div>
 	</section>
 
@@ -292,7 +288,7 @@
 
 <style>
 	main {
-		max-width: 620px;
+		max-width: 820px;
 		margin: 0 auto;
 		padding: 3rem 1.25rem 5rem;
 	}
@@ -532,16 +528,16 @@
 		padding: 1.5rem 0;
 		border-top: 1px solid rgba(210, 201, 160, 0.06);
 		font-size: 0.75rem;
-		color: rgba(210, 201, 160, 0.3);
+		color: rgba(210, 201, 160, 0.4);
 	}
 
 	.footer-logo {
-		width: 18px;
-		height: 18px;
+		width: 22px;
+		height: 22px;
 	}
 
 	footer a {
-		color: rgba(210, 201, 160, 0.45);
+		color: rgba(210, 201, 160, 0.6);
 		text-decoration: none;
 		transition: color 0.15s;
 	}

@@ -55,17 +55,15 @@ Each T-waypoint is **snapped to the nearest point on the track** (by geodesic di
 - Distance = sum of geodesic segments between consecutive track points
 - Ascent/descent = sum of positive/negative elevation differences along those points
 
-### Quality Indicators
+### Quality Indicator
 
-Each stage includes two quality metrics (traffic-light: green/yellow/red):
+Each stage includes a **Density** metric (traffic-light: green/yellow/red) showing the average spacing between consecutive track points:
 
-| Indicator | What it measures | Green | Yellow | Red |
-|-----------|-----------------|-------|--------|-----|
-| **Snap** | Distance from waypoint to nearest track point | ≤ 100 m | ≤ 400 m | > 400 m |
-| **Density** | Avg. spacing between consecutive track points | ≤ 50 m | ≤ 150 m | > 150 m |
+| Green | Yellow | Red |
+|-------|--------|-----|
+| ≤ 50 m — dense, accurate | ≤ 150 m — moderate | > 150 m — sparse, less accurate |
 
-- **Snap** — a large value means the stage boundary may be slightly off because the waypoint was far from the route
-- **Density** — sparse tracks cut corners, reducing distance/elevation accuracy
+Sparse tracks cut corners, reducing distance and elevation accuracy.
 
 ## Elevation Data
 

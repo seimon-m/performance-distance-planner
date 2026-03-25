@@ -200,7 +200,6 @@ describe('computeStages (integration)', () => {
 		expect(stages[0].distance).toBeGreaterThan(0);
 		expect(stages[0].ascent).toBe(70); // 20+20+30
 		expect(stages[0].descent).toBe(10);
-		expect(stages[0].snapDistance).toBeNull();
 		expect(stages[0].pointDensity).toBeGreaterThan(0);
 	});
 
