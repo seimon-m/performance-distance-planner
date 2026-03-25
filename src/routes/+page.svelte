@@ -576,6 +576,12 @@
 		flex-wrap: wrap;
 	}
 
+	.track-points {
+		font-size: 0.8rem;
+		color: rgba(210, 201, 160, 0.4);
+		font-weight: 400;
+	}
+
 	h2 {
 		font-size: 1.35rem;
 		font-weight: 700;
