@@ -283,6 +283,11 @@
 			Once calculated, you can export all stage data as a <strong>CSV file</strong> for use in spreadsheets or further planning. The export includes day number, distance, ascent, descent, and performance distance for each stage.
 		</p>
 	</section>
+
+	<footer>
+		<img src="/favicon.svg" alt="" class="footer-logo" />
+		<span>Built by <a href="https://seimon.ch" target="_blank" rel="noopener">Simon Müller</a></span>
+	</footer>
 </main>
 
 <style>
@@ -514,5 +519,34 @@
 		font-size: 1rem;
 		color: rgba(210, 201, 160, 0.55);
 		margin-top: 0.3rem;
+	}
+
+	/* ── Footer ── */
+
+	footer {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45rem;
+		margin-top: 3rem;
+		padding: 1.5rem 0;
+		border-top: 1px solid rgba(210, 201, 160, 0.06);
+		font-size: 0.75rem;
+		color: rgba(210, 201, 160, 0.3);
+	}
+
+	.footer-logo {
+		width: 18px;
+		height: 18px;
+	}
+
+	footer a {
+		color: rgba(210, 201, 160, 0.45);
+		text-decoration: none;
+		transition: color 0.15s;
+	}
+
+	footer a:hover {
+		color: #D4719A;
 	}
 </style>
