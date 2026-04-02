@@ -15,6 +15,7 @@ A client-side web tool that parses GPX/KML files, splits routes into daily stage
 - **API toggle** — switch elevation provider on the fly; auto-refetches when a file is loaded
 - **Adjustable formula** — configurable ascent/descent divisors for the Lkm calculation
 - **CSV export** — download stage data for spreadsheets
+- **Route map** — interactive 3D satellite map with color-coded route (elevation or steepness), waypoint markers, and terrain toggle
 - **Info page** — built-in guide explaining route planning and calculations
 
 ## Performance Distance Formula
@@ -85,6 +86,8 @@ src/
 │   ├── calc.js           — Stage splitting, distance/ascent/descent, Lkm calculation
 │   ├── elevation.js      — Elevation API (Open-Elevation + Open-Meteo, switchable)
 │   ├── csv.js            — CSV generation and download
+│   ├── map-colors.js     — Color ramps, quantized GeoJSON segments for map visualization
+│   ├── RouteMap.svelte   — Interactive 3D satellite map component (MapLibre GL)
 │   ├── store.svelte.js   — Shared state (persists across navigation)
 │   ├── gpx.test.js       — Tests: parsing, waypoint filtering, variants
 │   ├── calc.test.js      — Tests: stage calculation, performance distance
@@ -103,7 +106,7 @@ File Upload → parseFile() → extractTrack() + extractWaypoints()
   → filterStageWaypoints()   (T-prefix only, preferred variant)
   → fetchElevation()         (if no elevation data; uses selected API)
   → computeStages()          (split track, calculate per stage)
-  → Results table / CSV export
+  → Results table / CSV export / Route map
 ```
 
 ## Tech Stack
@@ -111,6 +114,7 @@ File Upload → parseFile() → extractTrack() + extractWaypoints()
 - **SvelteKit** (Svelte 5) — client-only, static adapter, no SSR
 - **@tmcw/togeojson** — GPX/KML → GeoJSON conversion
 - **geolib** — geodesic distance calculation
+- **MapLibre GL** — interactive map with 3D terrain (Esri satellite tiles, AWS Terrarium DEM)
 - **Open-Elevation API** / **Open-Meteo API** — elevation data (free, no API key)
 - **Vitest** — unit tests
 

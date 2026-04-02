@@ -4,13 +4,16 @@
 	import { stagesToCSV, downloadCSV } from '$lib/csv.js';
 	import { fetchElevation, hasElevationData, PROVIDERS } from '$lib/elevation.js';
 	import { getAppState } from '$lib/store.svelte.js';
+	import RouteMap from '$lib/RouteMap.svelte';
 
 	const app = getAppState();
+	let showMap = $state(false);
 
 	async function processFile(file) {
 		if (!file) return;
 		app.error = '';
 		app.stages = [];
+		showMap = false;
 		app.filename = file.name;
 		app.loading = true;
 
@@ -279,9 +282,20 @@
 				</table>
 			</div>
 
-			<button class="export-btn" onclick={exportCSV}>
-				Export CSV
-			</button>
+			<div class="results-actions">
+				<button class="export-btn" onclick={exportCSV}>
+					Export CSV
+				</button>
+				<button class="map-btn" onclick={() => showMap = !showMap}>
+					{showMap ? 'Hide Map' : 'Show Map'}
+				</button>
+			</div>
+
+			{#if showMap && app.currentTrack}
+				<div class="map-section">
+					<RouteMap track={app.currentTrack} waypoints={app.currentWaypoints ?? []} />
+				</div>
+			{/if}
 		</div>
 	{/if}
 
@@ -796,13 +810,20 @@
 		color: rgba(210, 201, 160, 0.2);
 	}
 
-	/* ── Export button ── */
+	/* ── Results actions ── */
 
-	.export-btn {
+	.results-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin-top: 1rem;
+	}
+
+	.export-btn,
+	.map-btn {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		margin-top: 1rem;
 		padding: 0.55rem 1.1rem;
 		background: transparent;
 		color: #D4719A;
@@ -815,13 +836,21 @@
 		transition: all 0.15s ease;
 	}
 
-	.export-btn:hover {
+	.export-btn:hover,
+	.map-btn:hover {
 		background: rgba(212, 113, 154, 0.08);
 		border-color: #D4719A;
 	}
 
-	.export-btn:active {
+	.export-btn:active,
+	.map-btn:active {
 		transform: scale(0.97);
+	}
+
+	/* ── Map section ── */
+
+	.map-section {
+		margin-top: 1.25rem;
 	}
 
 	/* ── Footer ── */
