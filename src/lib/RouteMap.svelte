@@ -3,7 +3,7 @@
 	import { buildColoredSegments, rampToGradient } from './map-colors.js';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 
-	let { track, waypoints = [] } = $props();
+	let { track, waypoints = [], onClose = null } = $props();
 
 	let mapContainer;
 	let map;
@@ -60,8 +60,9 @@
 			},
 			bounds: [[minLon, minLat], [maxLon, maxLat]],
 			fitBoundsOptions: { padding: 40 },
-			pitch: 60,
-			maxPitch: 85
+			pitch: 45,
+			maxPitch: 85,
+			maxZoom: 17
 		});
 
 		map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
@@ -146,6 +147,9 @@
 	<div class="map-container" bind:this={mapContainer}></div>
 
 	<div class="map-footer">
+		{#if onClose}
+			<button class="map-close-btn" onclick={onClose}>Hide Map</button>
+		{/if}
 		<div class="map-footer-toggles">
 			<button
 				class="map-toggle-btn"
@@ -230,6 +234,26 @@
 		gap: 0.75rem;
 		padding: 0.5rem 0.75rem;
 		background: rgba(2, 45, 24, 0.55);
+	}
+
+	.map-close-btn {
+		padding: 0.3rem 0.7rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		font-family: 'Karla', system-ui, sans-serif;
+		color: rgba(210, 201, 160, 0.5);
+		background: transparent;
+		border: 1.5px solid rgba(210, 201, 160, 0.12);
+		border-radius: 7px;
+		cursor: pointer;
+		transition: color 0.15s, border-color 0.15s;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.map-close-btn:hover {
+		color: rgba(210, 201, 160, 0.8);
+		border-color: rgba(210, 201, 160, 0.25);
 	}
 
 	.map-toggle-btn {

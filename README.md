@@ -14,8 +14,9 @@ A client-side web tool that parses GPX/KML files, splits routes into daily stage
 - **Elevation lookup** — switchable between [Open-Elevation](https://open-elevation.com) and [Open-Meteo](https://open-meteo.com), with auto-retry
 - **API toggle** — switch elevation provider on the fly; auto-refetches when a file is loaded
 - **Adjustable formula** — configurable ascent/descent divisors for the Lkm calculation
-- **CSV export** — download stage data for spreadsheets
-- **Route map** — interactive 3D satellite map with color-coded route (elevation or steepness), waypoint markers, and terrain toggle
+- **CSV export** — transposed layout (rows = metrics, columns = days + Total) ready for spreadsheet use
+- **Stage chart** — dual-axis canvas chart: elevation bars (hm ↑/↓) on the left axis, Lkm line on the right axis; dynamic scaling; downloadable as a print-friendly PNG at 4× resolution
+- **Route map** — interactive 3D satellite map with color-coded route (elevation or steepness), waypoint markers, and terrain toggle; the MapLibre GL bundle is dynamically imported only when the map is revealed, with a static placeholder shown until then
 - **Info page** — built-in guide explaining route planning and calculations
 
 ## Performance Distance Formula
@@ -85,7 +86,8 @@ src/
 │   ├── gpx.js            — GPX/KML parsing, waypoint filtering, variant selection
 │   ├── calc.js           — Stage splitting, distance/ascent/descent, Lkm calculation
 │   ├── elevation.js      — Elevation API (Open-Elevation + Open-Meteo, switchable)
-│   ├── csv.js            — CSV generation and download
+│   ├── csv.js            — CSV generation (transposed layout) and download
+│   ├── StageChart.svelte — Dual-axis canvas chart (hm bars + Lkm line), screen & print themes
 │   ├── map-colors.js     — Color ramps, quantized GeoJSON segments for map visualization
 │   ├── RouteMap.svelte   — Interactive 3D satellite map component (MapLibre GL)
 │   ├── store.svelte.js   — Shared state (persists across navigation)
@@ -106,7 +108,7 @@ File Upload → parseFile() → extractTrack() + extractWaypoints()
   → filterStageWaypoints()   (T-prefix only, preferred variant)
   → fetchElevation()         (if no elevation data; uses selected API)
   → computeStages()          (split track, calculate per stage)
-  → Results table / CSV export / Route map
+  → Results table / CSV export / Stage chart / Route map (dynamically imported on reveal)
 ```
 
 ## Tech Stack

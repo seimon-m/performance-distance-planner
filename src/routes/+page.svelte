@@ -4,10 +4,18 @@
 	import { stagesToCSV, downloadCSV } from '$lib/csv.js';
 	import { fetchElevation, hasElevationData, PROVIDERS } from '$lib/elevation.js';
 	import { getAppState } from '$lib/store.svelte.js';
-	import RouteMap from '$lib/RouteMap.svelte';
+	import StageChart from '$lib/StageChart.svelte';
 
 	const app = getAppState();
 	let showMap = $state(false);
+	let RouteMap = $state(null);
+
+	async function revealMap() {
+		showMap = true;
+		if (!RouteMap) {
+			RouteMap = (await import('$lib/RouteMap.svelte')).default;
+		}
+	}
 
 	async function processFile(file) {
 		if (!file) return;
@@ -286,15 +294,49 @@
 				<button class="export-btn" onclick={exportCSV}>
 					Export CSV
 				</button>
-				<button class="map-btn" onclick={() => showMap = !showMap}>
-					{showMap ? 'Hide Map' : 'Show Map'}
-				</button>
 			</div>
 
-			{#if showMap && app.currentTrack}
-				<div class="map-section">
-					<RouteMap track={app.currentTrack} waypoints={app.currentWaypoints ?? []} />
-				</div>
+			{#if app.stages.length > 1}
+				<StageChart stages={app.stages} />
+			{/if}
+
+			{#if app.currentTrack}
+				{#if showMap && RouteMap}
+					<div class="map-section">
+						<RouteMap
+							track={app.currentTrack}
+							waypoints={app.currentWaypoints ?? []}
+							onClose={() => showMap = false}
+						/>
+					</div>
+				{:else}
+					<div class="map-placeholder">
+						<svg class="map-placeholder-bg" aria-hidden="true" viewBox="0 0 800 160" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+							<!-- two subtle curved roads -->
+							<path d="M0,110 Q300,60 500,85 Q650,105 800,65" fill="none" stroke="rgba(210,201,160,0.09)" stroke-width="12" stroke-linecap="round"/>
+							<path d="M0,50  Q200,90 420,55 Q600,25 800,50" fill="none" stroke="rgba(210,201,160,0.07)" stroke-width="7"  stroke-linecap="round"/>
+							<!-- a few building blocks -->
+							<rect x="60"  y="18"  width="36" height="18" rx="3" fill="rgba(210,201,160,0.05)"/>
+							<rect x="620" y="115" width="40" height="20" rx="3" fill="rgba(210,201,160,0.05)"/>
+							<rect x="720" y="20"  width="28" height="14" rx="3" fill="rgba(210,201,160,0.05)"/>
+							<!-- start pin -->
+							<g transform="translate(180,72)">
+								<ellipse cx="0" cy="-2" rx="9" ry="9" fill="rgba(212,113,154,0.7)"/>
+								<polygon points="-4,5 4,5 0,15" fill="rgba(212,113,154,0.7)"/>
+								<circle cx="0" cy="-2" r="3.5" fill="rgba(2,45,24,0.75)"/>
+							</g>
+							<!-- end pin -->
+							<g transform="translate(640,58)">
+								<ellipse cx="0" cy="-2" rx="9" ry="9" fill="rgba(212,113,154,0.7)"/>
+								<polygon points="-4,5 4,5 0,15" fill="rgba(212,113,154,0.7)"/>
+								<circle cx="0" cy="-2" r="3.5" fill="rgba(2,45,24,0.75)"/>
+							</g>
+						</svg>
+						<button class="map-reveal-btn" onclick={revealMap}>
+							{showMap ? 'Loading Map…' : 'Show Route Map'}
+						</button>
+					</div>
+				{/if}
 			{/if}
 		</div>
 	{/if}
@@ -819,8 +861,7 @@
 		margin-top: 1rem;
 	}
 
-	.export-btn,
-	.map-btn {
+	.export-btn {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
@@ -836,21 +877,60 @@
 		transition: all 0.15s ease;
 	}
 
-	.export-btn:hover,
-	.map-btn:hover {
+	.export-btn:hover {
 		background: rgba(212, 113, 154, 0.08);
 		border-color: #D4719A;
 	}
 
-	.export-btn:active,
-	.map-btn:active {
+	.export-btn:active {
 		transform: scale(0.97);
 	}
 
 	/* ── Map section ── */
 
 	.map-section {
-		margin-top: 1.25rem;
+		margin-top: 2rem;
+	}
+
+	.map-placeholder {
+		position: relative;
+		margin-top: 2rem;
+		height: 160px;
+		border-radius: 14px;
+		overflow: hidden;
+		border: 1px solid rgba(210, 201, 160, 0.08);
+		background: rgba(210, 201, 160, 0.02);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.map-placeholder-bg {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+	}
+
+	.map-reveal-btn {
+		position: relative;
+		z-index: 1;
+		padding: 0.65rem 1.6rem;
+		background: rgba(212, 113, 154, 0.12);
+		color: #D4719A;
+		border: 1.5px solid rgba(212, 113, 154, 0.35);
+		border-radius: 10px;
+		font-size: 0.95rem;
+		font-weight: 700;
+		font-family: 'Karla', system-ui, sans-serif;
+		cursor: pointer;
+		transition: background 0.15s, border-color 0.15s;
+		letter-spacing: 0.01em;
+	}
+
+	.map-reveal-btn:hover {
+		background: rgba(212, 113, 154, 0.22);
+		border-color: #D4719A;
 	}
 
 	/* ── Footer ── */
