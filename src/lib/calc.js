@@ -72,6 +72,10 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 	let stageSegments = 0; // number of point-to-point segments
 	let dayNumber = 1;
 
+	// Points without elevation carry the last known value forward —
+	// treating them as 0 m would fabricate huge ascent/descent spikes.
+	let lastEle = track[0]?.[2] ?? null;
+
 	for (let i = 1; i < track.length; i++) {
 		const prev = track[i - 1];
 		const curr = track[i];
@@ -85,14 +89,16 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 		stageSegments++;
 
 		// Accumulate elevation gain and loss
-		const prevEle = prev[2] ?? 0;
-		const currEle = curr[2] ?? 0;
-		const eleDiff = currEle - prevEle;
-		if (eleDiff > 0) {
-			stageAscent += eleDiff;
-		} else if (eleDiff < 0) {
-			stageDescent += Math.abs(eleDiff);
+		const currEle = curr[2] ?? lastEle;
+		if (lastEle != null && currEle != null) {
+			const eleDiff = currEle - lastEle;
+			if (eleDiff > 0) {
+				stageAscent += eleDiff;
+			} else if (eleDiff < 0) {
+				stageDescent += Math.abs(eleDiff);
+			}
 		}
+		if (currEle != null) lastEle = currEle;
 
 		// If we reached a split point, close the current stage
 		if (splitIndices.has(i)) {

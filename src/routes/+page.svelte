@@ -1,8 +1,8 @@
 <script>
 	import { parseFile } from '$lib/gpx.js';
-	import { computeStages } from '$lib/calc.js';
+	import { computeStages, sortWaypointsAlongTrack } from '$lib/calc.js';
 	import { stagesToCSV, downloadCSV } from '$lib/csv.js';
-	import { fetchElevation, hasElevationData, PROVIDERS } from '$lib/elevation.js';
+	import { fetchElevation, hasElevationData, fillElevationGaps, PROVIDERS } from '$lib/elevation.js';
 	import { getAppState } from '$lib/store.svelte.js';
 	import StageChart from '$lib/StageChart.svelte';
 
@@ -20,6 +20,7 @@
 	async function processFile(file) {
 		if (!file) return;
 		app.error = '';
+		app.notice = '';
 		app.stages = [];
 		showMap = false;
 		app.filename = file.name;
@@ -45,8 +46,9 @@
 				}
 			}
 
-			app.currentTrack = track;
-			app.stages = computeStages(track, waypoints, app.ascentDivisor, app.descentDivisor);
+			app.currentTrack = fillElevationGaps(track);
+			app.stages = computeStages(app.currentTrack, waypoints, app.ascentDivisor, app.descentDivisor);
+			app.notice = checkWaypointCollisions(app.currentTrack, waypoints);
 		} catch (err) {
 			app.error = err.message || 'Error processing file.';
 			app.stages = [];
@@ -56,8 +58,24 @@
 		}
 	}
 
+	/**
+	 * Warn when two stage waypoints snap to the same track point —
+	 * their stages get silently merged, which is confusing to debug.
+	 */
+	function checkWaypointCollisions(track, waypoints) {
+		if (waypoints.length < 2) return '';
+		const sorted = sortWaypointsAlongTrack(waypoints, track);
+		const uniqueIndices = new Set(sorted.map((wp) => wp.trackIndex));
+		if (uniqueIndices.size < sorted.length) {
+			const merged = sorted.length - uniqueIndices.size;
+			return `${merged} stage waypoint${merged === 1 ? '' : 's'} snapped to the same track point as another — the affected days were merged into one stage. Check that consecutive waypoints sit at distinct spots along the route.`;
+		}
+		return '';
+	}
+
 	async function refetchElevation(provider) {
 		if (!app.currentRawTrack || !app.currentWaypoints) return;
+		const previousProvider = app.elevationProvider;
 		app.elevationProvider = provider;
 		app.error = '';
 		app.loading = true;
@@ -71,11 +89,12 @@
 					: `Fetching elevation data (batch ${batch}/${total})…`;
 			});
 
-			app.currentTrack = track;
-			app.stages = computeStages(track, app.currentWaypoints, app.ascentDivisor, app.descentDivisor);
+			app.currentTrack = fillElevationGaps(track);
+			app.stages = computeStages(app.currentTrack, app.currentWaypoints, app.ascentDivisor, app.descentDivisor);
 		} catch (err) {
+			// Keep the existing results — they still match the previous provider
 			app.error = err.message || 'Error fetching elevation data.';
-			app.stages = [];
+			app.elevationProvider = previousProvider;
 		} finally {
 			app.loading = false;
 			app.loadingMessage = '';
@@ -90,7 +109,8 @@
 		event.preventDefault();
 		app.dragging = false;
 		const file = event.dataTransfer?.files?.[0];
-		if (file && (file.name.endsWith('.gpx') || file.name.endsWith('.kml'))) {
+		const name = file?.name.toLowerCase() ?? '';
+		if (file && (name.endsWith('.gpx') || name.endsWith('.kml'))) {
 			processFile(file);
 		}
 	}
@@ -113,6 +133,17 @@
 		if (app.currentTrack && app.currentWaypoints) {
 			app.stages = computeStages(app.currentTrack, app.currentWaypoints, app.ascentDivisor, app.descentDivisor);
 		}
+	}
+
+	/**
+	 * Update a divisor from an input field, ignoring empty/invalid values —
+	 * a cleared field would otherwise become 0 and divide by zero.
+	 */
+	function setDivisor(key, rawValue) {
+		const v = Math.floor(+rawValue);
+		if (!Number.isFinite(v) || v < 1) return;
+		app[key] = v;
+		recalculate();
 	}
 
 	let totalDistance = $derived(
@@ -190,6 +221,13 @@
 		</div>
 	{/if}
 
+	{#if app.notice}
+		<div class="notice" role="status">
+			<span class="notice-icon">!</span>
+			{app.notice}
+		</div>
+	{/if}
+
 	{#if app.stages.length > 0}
 		<div class="results">
 			<div class="results-header">
@@ -208,17 +246,17 @@
 					min="1"
 					step="1"
 					value={app.ascentDivisor}
-					oninput={(e) => { app.ascentDivisor = +e.target.value; recalculate(); }}
+					oninput={(e) => setDivisor('ascentDivisor', e.target.value)}
 				/>m)</span></span>
 				{#if app.descentDivisor > 0}
 					<span class="formula-op">+</span>
 					<span class="formula-part">Descent <span class="formula-unit">(in <input
 						id="descent-divisor"
 						type="number"
-						min="0"
+						min="1"
 						step="1"
 						value={app.descentDivisor}
-						oninput={(e) => { app.descentDivisor = +e.target.value; recalculate(); }}
+						oninput={(e) => setDivisor('descentDivisor', e.target.value)}
 					/>m)</span></span>
 				{/if}
 				<button class="toggle-descent" onclick={() => { app.descentDivisor = app.descentDivisor > 0 ? 0 : 150; recalculate(); }}>
@@ -348,19 +386,6 @@
 </main>
 
 <style>
-	:global(*) {
-		box-sizing: border-box;
-	}
-
-	:global(body) {
-		font-family: 'Karla', system-ui, sans-serif;
-		background: #022D18;
-		color: #D2C9A0;
-		margin: 0;
-		padding: 0;
-		-webkit-font-smoothing: antialiased;
-	}
-
 	main {
 		max-width: 820px;
 		margin: 0 auto;
@@ -585,6 +610,34 @@
 		justify-content: center;
 		border-radius: 50%;
 		background: rgba(218, 107, 39, 0.18);
+		font-size: 0.7rem;
+		font-weight: 800;
+	}
+
+	/* ── Notice (non-fatal warning) ── */
+
+	.notice {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		background: rgba(250, 173, 23, 0.07);
+		color: #FAAD17;
+		border-radius: 12px;
+		padding: 0.85rem 1rem;
+		margin-bottom: 1.25rem;
+		font-size: 0.95rem;
+		line-height: 1.45;
+	}
+
+	.notice-icon {
+		flex-shrink: 0;
+		width: 1.3rem;
+		height: 1.3rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		background: rgba(250, 173, 23, 0.15);
 		font-size: 0.7rem;
 		font-weight: 800;
 	}

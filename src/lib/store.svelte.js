@@ -3,6 +3,7 @@ import { DEFAULT_PROVIDER } from './elevation.js';
 
 let stages = $state([]);
 let error = $state('');
+let notice = $state('');
 let filename = $state('');
 let loading = $state(false);
 let loadingMessage = $state('');
@@ -20,6 +21,8 @@ export function getAppState() {
 		set stages(v) { stages = v; },
 		get error() { return error; },
 		set error(v) { error = v; },
+		get notice() { return notice; },
+		set notice(v) { notice = v; },
 		get filename() { return filename; },
 		set filename(v) { filename = v; },
 		get loading() { return loading; },

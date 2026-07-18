@@ -14,7 +14,7 @@ A client-side web tool that parses GPX/KML files, splits routes into daily stage
 - **Elevation lookup** — switchable between [Open-Elevation](https://open-elevation.com) and [Open-Meteo](https://open-meteo.com), with auto-retry
 - **API toggle** — switch elevation provider on the fly; auto-refetches when a file is loaded
 - **Adjustable formula** — configurable ascent/descent divisors for the Lkm calculation
-- **CSV export** — transposed layout (rows = metrics, columns = days + Total) ready for spreadsheet use
+- **CSV export** — transposed layout (rows = metrics, columns = days + Total) with a `sep=,` hint so Excel parses it correctly in any locale
 - **Stage chart** — dual-axis canvas chart: elevation bars (hm ↑/↓) on the left axis, Lkm line on the right axis; dynamic scaling; downloadable as a print-friendly PNG at 4× resolution
 - **Route map** — interactive 3D satellite map with color-coded route (elevation or steepness), waypoint markers, and terrain toggle; the MapLibre GL bundle is dynamically imported only when the map is revealed, with a static placeholder shown until then
 - **Info page** — built-in guide explaining route planning and calculations
@@ -113,7 +113,7 @@ File Upload → parseFile() → extractTrack() + extractWaypoints()
 
 ## Tech Stack
 
-- **SvelteKit** (Svelte 5) — client-only, static adapter, no SSR
+- **SvelteKit** (Svelte 5) — client-only, no SSR, deployed on Vercel
 - **@tmcw/togeojson** — GPX/KML → GeoJSON conversion
 - **geolib** — geodesic distance calculation
 - **MapLibre GL** — interactive map with 3D terrain (Esri satellite tiles, AWS Terrarium DEM)
@@ -133,7 +133,7 @@ npm run dev
 npm test
 ```
 
-31 tests covering waypoint filtering, stage calculation, and CSV export.
+36 tests covering waypoint filtering, stage calculation, elevation handling, and CSV export.
 
 ## Build
 
@@ -142,4 +142,4 @@ npm run build
 npm run preview
 ```
 
-Uses `@sveltejs/adapter-static` for static hosting (Netlify, Vercel, GitHub Pages, etc.).
+Uses `@sveltejs/adapter-vercel`; deployed to Vercel via the GitHub integration (push to `main` = production deploy).

@@ -149,3 +149,25 @@ function delay(ms) {
 export function hasElevationData(track) {
 	return track.some((p) => p[2] !== undefined && p[2] !== 0);
 }
+
+/**
+ * Fill missing elevation values by carrying the last known value forward.
+ * Leading gaps take the first known value. Tracks with no elevation at all
+ * are returned unchanged.
+ *
+ * @param {Array<[number, number, number?]>} track
+ * @returns {Array<[number, number, number?]>}
+ */
+export function fillElevationGaps(track) {
+	const firstKnown = track.find((p) => p[2] != null);
+	if (!firstKnown) return track;
+
+	let lastEle = firstKnown[2];
+	return track.map((p) => {
+		if (p[2] != null) {
+			lastEle = p[2];
+			return p;
+		}
+		return [p[0], p[1], lastEle];
+	});
+}

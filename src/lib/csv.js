@@ -20,7 +20,10 @@ export function stagesToCSV(stages) {
 	const descentRow = ['Down (m)', ...stages.map((s) => s.descent), totalDescent].join(',');
 	const lkmRow = ['Performance Distance (Lkm)', ...stages.map((s) => s.performanceKm), totalLkm].join(',');
 
-	return [header, distRow, ascentRow, descentRow, lkmRow].join('\n');
+	// 'sep=,' tells Excel to split on commas regardless of locale
+	// (Swiss/German Excel defaults to semicolons and would otherwise
+	// show everything in one column). Other tools ignore or show it as one row.
+	return ['sep=,', header, distRow, ascentRow, descentRow, lkmRow].join('\n');
 }
 
 /**

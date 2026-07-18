@@ -181,6 +181,33 @@ describe('calculateStages', () => {
 		expect(stages[0].ascent).toBe(0);
 		expect(stages[0].distance).toBeGreaterThan(0);
 	});
+
+	it('carries elevation forward across points with missing elevation', () => {
+		// Middle point has no elevation — must not count as a drop to 0 m and back
+		const track = [
+			[8.0, 47.0, 2000],
+			[8.01, 47.0],
+			[8.02, 47.0, 2100]
+		];
+
+		const stages = calculateStages(track, []);
+
+		expect(stages[0].ascent).toBe(100); // 2000 → 2100, gap ignored
+		expect(stages[0].descent).toBe(0);
+	});
+
+	it('ignores leading points with missing elevation', () => {
+		const track = [
+			[8.0, 47.0],
+			[8.01, 47.0, 1500],
+			[8.02, 47.0, 1550]
+		];
+
+		const stages = calculateStages(track, []);
+
+		expect(stages[0].ascent).toBe(50);
+		expect(stages[0].descent).toBe(0);
+	});
 });
 
 describe('computeStages (integration)', () => {

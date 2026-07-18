@@ -21,4 +21,6 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-src/lib/assets/EB24_T12.kml
+# Route files contain real waypoint/location data — never commit them
+*.gpx
+*.kml

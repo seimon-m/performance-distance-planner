@@ -7,11 +7,14 @@
 
 	let mapContainer;
 	let map;
+	let destroyed = false;
 	let mode = $state('elevation');
 	let showInfo = $state(false);
 
 	onMount(async () => {
 		const maplibregl = await import('maplibre-gl');
+		// Component may have been destroyed while the bundle was loading
+		if (destroyed) return;
 
 		// Compute bounds for the track
 		let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
@@ -89,6 +92,7 @@
 	});
 
 	onDestroy(() => {
+		destroyed = true;
 		if (map) map.remove();
 	});
 

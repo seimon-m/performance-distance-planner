@@ -191,17 +191,22 @@
 		<h3>Open-Meteo (fallback)</h3>
 		<ul>
 			<li>Based on <strong>Copernicus DEM</strong> with ~90 m resolution</li>
-			<li>Coordinates are sent in <strong>batched GET requests</strong> (50 points per batch, 1.5 s delay)</li>
+			<li>Coordinates are sent in <strong>batched GET requests</strong> (50 points per batch, 3 s delay)</li>
 			<li>Free, no API key required</li>
 		</ul>
 
 		<p>
-			Both providers automatically <strong>retry up to 3 times</strong> if a request fails (e.g. rate limit or server error). If one API isn't working, switch to the other and try again.
+			Both providers automatically <strong>retry with backoff</strong> if a request fails (e.g. rate limit or server error). If one API isn't working, switch to the other and try again.
 		</p>
 
 		<div class="tip">
 			The elevation lookup may take a few seconds depending on route length and API load. Open-Meteo is generally more reliable; Open-Elevation offers higher resolution but may have downtime.
 		</div>
+
+		<h3>Privacy</h3>
+		<p>
+			Everything runs in your browser — uploaded files are <strong>never stored on a server</strong>. To fetch elevation data, your route's coordinates are sent to the selected elevation API (Open-Elevation or Open-Meteo), and the optional route map loads satellite and terrain tiles from Esri and AWS. No account, no cookies, no tracking of personal data.
+		</p>
 	</section>
 
 	<section>
