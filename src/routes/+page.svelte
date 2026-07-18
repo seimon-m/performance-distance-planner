@@ -164,7 +164,7 @@
 
 <main>
 	<header>
-		<h1>Performance Distance Planner</h1>
+		<h1>Route Checker</h1>
 		<p class="subtitle">Get daily stages and performance kilometers from your Google Earth route</p>
 		<a href="/info" class="info-btn">How it works</a>
 	</header>

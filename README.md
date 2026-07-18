@@ -1,6 +1,8 @@
-# Performance Distance Planner
+# Route Checker
 
 Get daily stages and performance kilometers from your Google Earth route.
+
+Live at [route-checker.ch](https://www.route-checker.ch).
 
 A client-side web tool that parses GPX/KML files, splits routes into daily stages based on waypoints, fetches elevation data, and calculates performance distance (Leistungskilometer) for each stage.
 
