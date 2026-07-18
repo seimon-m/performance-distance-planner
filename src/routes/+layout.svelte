@@ -4,7 +4,6 @@
 	import '@fontsource/karla/600.css';
 	import '@fontsource/karla/700.css';
 	import '@fontsource/karla/800.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import { dev } from '$app/environment';
 	import { injectAnalytics } from '@vercel/analytics/sveltekit';
 
@@ -12,21 +11,9 @@
 
 	injectAnalytics({ mode: dev ? 'development' : 'production' });
 
-	const title = 'Performance Distance Planner';
-	const description =
-		'Upload a GPX or KML route from Google Earth and get daily stages with distance, ascent, descent and performance kilometers (Leistungskilometer) — including CSV export, stage chart and 3D route map.';
+	// Title, meta description, OG tags and favicon live in app.html —
+	// SSR is disabled, so svelte:head content never reaches crawlers.
 </script>
-
-<svelte:head>
-	<title>{title}</title>
-	<meta name="description" content={description} />
-	<meta property="og:title" content={title} />
-	<meta property="og:description" content={description} />
-	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://performance-distance-planner.vercel.app/" />
-	<meta name="twitter:card" content="summary" />
-	<link rel="icon" href={favicon} />
-</svelte:head>
 
 {@render children()}
 
