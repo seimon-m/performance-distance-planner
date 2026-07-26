@@ -1,5 +1,51 @@
 import { describe, it, expect } from 'vitest';
-import { sortWaypointsAlongTrack, calculateStages, buildStage, computeStages } from './calc.js';
+import { sortWaypointsAlongTrack, calculateStages, buildStage, computeStages, walkingTime, formatDuration } from './calc.js';
+
+describe('walkingTime', () => {
+	it('uses SAC formula: larger component plus half the smaller', () => {
+		// 12 km at 4 km/h = 3 h horizontal; 600 m ↑ at 300 m/h = 2 h vertical
+		// total = 3 + 2/2 = 4 h
+		expect(walkingTime(12, 600, 0, 4, 300, 500)).toBe(4);
+	});
+
+	it('handles vertical time dominating', () => {
+		// 2 km at 4 km/h = 0.5 h; 900 m ↑ at 300 m/h = 3 h
+		// total = 3 + 0.5/2 = 3.25 h
+		expect(walkingTime(2, 900, 0, 4, 300, 500)).toBe(3.25);
+	});
+
+	it('includes descent in vertical time', () => {
+		// 4 km at 4 km/h = 1 h; 300 m ↑ / 300 + 500 m ↓ / 500 = 2 h
+		// total = 2 + 1/2 = 2.5 h
+		expect(walkingTime(4, 300, 500, 4, 300, 500)).toBe(2.5);
+	});
+
+	it('returns 0 for an empty stage', () => {
+		expect(walkingTime(0, 0, 0)).toBe(0);
+	});
+
+	it('signpost sanity check: 10 km flat at default speed ≈ 2:23', () => {
+		const hours = walkingTime(10, 0, 0);
+		expect(formatDuration(hours)).toBe('2:23');
+	});
+});
+
+describe('formatDuration', () => {
+	it('formats hours as h:mm', () => {
+		expect(formatDuration(5.5)).toBe('5:30');
+		expect(formatDuration(0.25)).toBe('0:15');
+		expect(formatDuration(10)).toBe('10:00');
+	});
+
+	it('pads minutes and rounds to the nearest minute', () => {
+		expect(formatDuration(1.01)).toBe('1:01'); // 60.6 min → 61 min
+		expect(formatDuration(2.999)).toBe('3:00');
+	});
+
+	it('handles zero', () => {
+		expect(formatDuration(0)).toBe('0:00');
+	});
+});
 
 describe('buildStage', () => {
 	it('calculates performance km with ascent only by default (descentDivisor=0)', () => {

@@ -1,9 +1,12 @@
+import { formatDuration } from './calc.js';
+
 /**
  * Convert stage results to a CSV string.
  *
  * Layout: rows = metrics, columns = Day 1…N + Total (matching spreadsheet view).
+ * A walking time row is included when stages carry a walkingTime (hours).
  *
- * @param {Array<{ day: number, distance: number, ascent: number, descent: number, performanceKm: number }>} stages
+ * @param {Array<{ day: number, distance: number, ascent: number, descent: number, performanceKm: number, walkingTime?: number }>} stages
  * @returns {string} CSV content
  */
 export function stagesToCSV(stages) {
@@ -23,7 +26,14 @@ export function stagesToCSV(stages) {
 	// 'sep=,' tells Excel to split on commas regardless of locale
 	// (Swiss/German Excel defaults to semicolons and would otherwise
 	// show everything in one column). Other tools ignore or show it as one row.
-	return ['sep=,', header, distRow, ascentRow, descentRow, lkmRow].join('\n');
+	const rows = ['sep=,', header, distRow, ascentRow, descentRow, lkmRow];
+
+	if (stages.some((s) => s.walkingTime != null)) {
+		const totalTime = stages.reduce((sum, s) => sum + (s.walkingTime ?? 0), 0);
+		rows.push(['Walking Time (h:mm)', ...stages.map((s) => formatDuration(s.walkingTime ?? 0)), formatDuration(totalTime)].join(','));
+	}
+
+	return rows.join('\n');
 }
 
 /**

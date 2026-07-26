@@ -14,6 +14,53 @@ export const DEFAULT_ASCENT_DIVISOR = 100;
 export const DEFAULT_DESCENT_DIVISOR = 0;
 
 /**
+ * Defaults for the SAC/DIN 33466 walking time formula,
+ * as used on Swiss hiking signposts.
+ */
+export const DEFAULT_BASE_SPEED = 4.2; // km/h on flat ground
+export const DEFAULT_ASCENT_RATE = 300; // m of ascent per hour
+export const DEFAULT_DESCENT_RATE = 500; // m of descent per hour
+
+/**
+ * Estimate walking time using the SAC/DIN 33466 formula:
+ * horizontal time = distance / baseSpeed, vertical time = ascent/ascentRate + descent/descentRate.
+ * Total = the larger of the two plus half of the smaller.
+ *
+ * @param {number} distanceKm - Horizontal distance in kilometers
+ * @param {number} ascentMeters - Positive elevation gain in meters
+ * @param {number} descentMeters - Positive elevation loss in meters
+ * @param {number} [baseSpeed=4.2] - Flat walking speed in km/h
+ * @param {number} [ascentRate=300] - Meters of ascent per hour
+ * @param {number} [descentRate=500] - Meters of descent per hour
+ * @returns {number} Estimated walking time in hours
+ */
+export function walkingTime(
+	distanceKm,
+	ascentMeters,
+	descentMeters,
+	baseSpeed = DEFAULT_BASE_SPEED,
+	ascentRate = DEFAULT_ASCENT_RATE,
+	descentRate = DEFAULT_DESCENT_RATE
+) {
+	const horizontal = distanceKm / baseSpeed;
+	const vertical = ascentMeters / ascentRate + descentMeters / descentRate;
+	return Math.max(horizontal, vertical) + Math.min(horizontal, vertical) / 2;
+}
+
+/**
+ * Format a duration in hours as "h:mm" (e.g. 5.58 → "5:35").
+ *
+ * @param {number} hours
+ * @returns {string}
+ */
+export function formatDuration(hours) {
+	const totalMinutes = Math.round(hours * 60);
+	const h = Math.floor(totalMinutes / 60);
+	const m = totalMinutes % 60;
+	return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+/**
  * Sort waypoints by their position along the track.
  * For each waypoint, find the nearest track point index,
  * then sort by that index ascending.

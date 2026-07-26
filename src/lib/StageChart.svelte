@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
+	import { formatDuration } from './calc.js';
 
 	let { stages } = $props();
 
@@ -103,6 +104,12 @@
 			ctx.fillStyle = theme.label;
 			ctx.textAlign = 'center';
 			ctx.fillText(`D${s.day}`, cx, PAD.top + chartH + 20);
+
+			if (s.walkingTime != null) {
+				ctx.font = '11px Karla, system-ui, sans-serif';
+				ctx.fillText(`${formatDuration(s.walkingTime)} h`, cx, PAD.top + chartH + 36);
+				ctx.font = '12px Karla, system-ui, sans-serif';
+			}
 		}
 
 		ctx.strokeStyle = theme.line;
@@ -176,6 +183,7 @@
 			s.ascent;
 			s.descent;
 			s.performanceKm;
+			s.walkingTime;
 		}
 		if (canvas) draw();
 	});
