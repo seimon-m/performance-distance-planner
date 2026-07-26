@@ -132,6 +132,20 @@ describe('sortWaypointsAlongTrack', () => {
 		const sorted = sortWaypointsAlongTrack(waypoints, track);
 		expect(sorted[0].trackIndex).toBe(1);
 	});
+
+	it('reports the snap distance to the nearest track point', () => {
+		const track = [
+			[8.0, 47.0, 500],
+			[8.001, 47.0, 510]
+		];
+
+		// ~0.001° latitude ≈ 111 m north of the track
+		const waypoints = [{ name: 'Camp', lon: 8.001, lat: 47.001 }];
+
+		const sorted = sortWaypointsAlongTrack(waypoints, track);
+		expect(sorted[0].snapDistance).toBeGreaterThan(90);
+		expect(sorted[0].snapDistance).toBeLessThan(130);
+	});
 });
 
 describe('calculateStages', () => {
@@ -159,6 +173,25 @@ describe('calculateStages', () => {
 		// Both stages should have positive distance
 		expect(stages[0].distance).toBeGreaterThan(0);
 		expect(stages[1].distance).toBeGreaterThan(0);
+	});
+
+	it('attaches the split waypoint name to each stage except the last', () => {
+		const track = [
+			[8.0, 47.0, 500],
+			[8.01, 47.0, 510],
+			[8.02, 47.0, 520],
+			[8.03, 47.0, 515],
+			[8.04, 47.0, 530]
+		];
+
+		const sortedWaypoints = [
+			{ name: 'T01.1', lon: 8.02, lat: 47.0, trackIndex: 2 }
+		];
+
+		const stages = calculateStages(track, sortedWaypoints);
+
+		expect(stages[0].endName).toBe('T01.1');
+		expect(stages[1].endName).toBe(null);
 	});
 
 	it('creates multiple stages with multiple waypoints', () => {

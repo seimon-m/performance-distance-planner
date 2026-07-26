@@ -15,6 +15,8 @@ let descentRate = $state(DEFAULT_DESCENT_RATE);
 let currentTrack = $state(null);
 let currentRawTrack = $state(null);
 let currentWaypoints = $state(null);
+let stageGroups = $state([]);
+let selectedVariants = $state({});
 let dragging = $state(false);
 let elevationProvider = $state(DEFAULT_PROVIDER);
 
@@ -48,6 +50,10 @@ export function getAppState() {
 		set currentRawTrack(v) { currentRawTrack = v; },
 		get currentWaypoints() { return currentWaypoints; },
 		set currentWaypoints(v) { currentWaypoints = v; },
+		get stageGroups() { return stageGroups; },
+		set stageGroups(v) { stageGroups = v; },
+		get selectedVariants() { return selectedVariants; },
+		set selectedVariants(v) { selectedVariants = v; },
 		get dragging() { return dragging; },
 		set dragging(v) { dragging = v; },
 		get elevationProvider() { return elevationProvider; },

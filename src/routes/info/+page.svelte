@@ -96,7 +96,7 @@
 
 		<h3>Multiple Options per Stage</h3>
 		<p>
-			If you have multiple overnight options for a stage, append a letter. The tool will automatically pick the preferred variant:
+			If you have multiple overnight options for a stage, append a letter. The tool picks the preferred variant by default:
 		</p>
 		<div class="examples">
 			<div class="example-row">
@@ -111,6 +111,12 @@
 				<code>T01.3b</code>
 				<span>Option B (lower priority)</span>
 			</div>
+		</div>
+		<p>
+			Nights with several options get a <strong>Tent spots</strong> switcher above the results table. Picking a different spot moves the split point between the two adjacent days and shows the difference against the preferred spot (e.g. "Day 3 +1.3 km / +150 hm↑").
+		</p>
+		<div class="tip">
+			A tent spot only affects where the route is <strong>split</strong> — all measurements still follow the track. If an alternative spot lies off the route (side spur, different valley), the extra way to it is not included; the tool warns when a spot is more than 500 m from the track.
 		</div>
 
 		<div class="tip">

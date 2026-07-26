@@ -1,5 +1,5 @@
 <script>
-	import { parseFile } from '$lib/gpx.js';
+	import { parseFile, selectStageWaypoints } from '$lib/gpx.js';
 	import { computeStages, sortWaypointsAlongTrack, walkingTime, formatDuration } from '$lib/calc.js';
 	import { stagesToCSV, downloadCSV } from '$lib/csv.js';
 	import { fetchElevation, hasElevationData, fillElevationGaps, PROVIDERS } from '$lib/elevation.js';
@@ -29,10 +29,12 @@
 		try {
 			app.loadingMessage = 'Parsing file…';
 			const text = await file.text();
-			let { track, waypoints } = parseFile(text, file.name);
+			let { track, waypoints, stageGroups } = parseFile(text, file.name);
 
 			app.currentRawTrack = track;
 			app.currentWaypoints = waypoints;
+			app.stageGroups = stageGroups;
+			app.selectedVariants = {};
 
 			if (!hasElevationData(track)) {
 				app.loadingMessage = `Fetching elevation data (${track.length} points)…`;
@@ -48,7 +50,7 @@
 
 			app.currentTrack = fillElevationGaps(track);
 			app.stages = computeStages(app.currentTrack, waypoints, app.ascentDivisor, app.descentDivisor);
-			app.notice = checkWaypointCollisions(app.currentTrack, waypoints);
+			app.notice = checkWaypointNotices(app.currentTrack, waypoints);
 		} catch (err) {
 			app.error = err.message || 'Error processing file.';
 			app.stages = [];
@@ -59,18 +61,45 @@
 	}
 
 	/**
-	 * Warn when two stage waypoints snap to the same track point —
-	 * their stages get silently merged, which is confusing to debug.
+	 * A waypoint this far from the route probably lies on a side spur the
+	 * track doesn't follow — measurements along the track won't reflect it.
 	 */
-	function checkWaypointCollisions(track, waypoints) {
-		if (waypoints.length < 2) return '';
+	const FAR_SNAP_METERS = 500;
+
+	/**
+	 * Warn about waypoint situations that silently skew the results:
+	 * - two stage waypoints snapping to the same track point (stages get merged)
+	 * - waypoints far away from the route (stats around them are unreliable)
+	 */
+	function checkWaypointNotices(track, waypoints) {
+		if (waypoints.length === 0) return '';
 		const sorted = sortWaypointsAlongTrack(waypoints, track);
+		const messages = [];
+
 		const uniqueIndices = new Set(sorted.map((wp) => wp.trackIndex));
 		if (uniqueIndices.size < sorted.length) {
 			const merged = sorted.length - uniqueIndices.size;
-			return `${merged} stage waypoint${merged === 1 ? '' : 's'} snapped to the same track point as another — the affected days were merged into one stage. Check that consecutive waypoints sit at distinct spots along the route.`;
+			messages.push(`${merged} stage waypoint${merged === 1 ? '' : 's'} snapped to the same track point as another — the affected days were merged into one stage. Check that consecutive waypoints sit at distinct spots along the route.`);
 		}
-		return '';
+
+		const far = sorted.filter((wp) => wp.snapDistance > FAR_SNAP_METERS);
+		if (far.length > 0) {
+			const names = far.map((wp) => `${wp.name} (${Math.round(wp.snapDistance)} m)`).join(', ');
+			messages.push(`${names} ${far.length === 1 ? 'is' : 'are'} far from the route. All measurements follow the track, so the extra way to ${far.length === 1 ? 'this spot' : 'these spots'} is not included.`);
+		}
+
+		return messages.join(' ');
+	}
+
+	/**
+	 * Pick a different tent spot for a night and redistribute the two
+	 * adjacent days accordingly.
+	 */
+	function selectTentSpot(stageNum, variant) {
+		app.selectedVariants = { ...app.selectedVariants, [stageNum]: variant };
+		app.currentWaypoints = selectStageWaypoints(app.stageGroups, app.selectedVariants);
+		recalculate();
+		app.notice = checkWaypointNotices(app.currentTrack, app.currentWaypoints);
 	}
 
 	async function refetchElevation(provider) {
@@ -154,6 +183,56 @@
 		const v = +rawValue;
 		if (!Number.isFinite(v) || v <= 0) return;
 		app[key] = v;
+	}
+
+	// Nights that have more than one tent spot option
+	let variantNights = $derived(app.stageGroups.filter((g) => g.variants.length > 1));
+	let nightsWithVariants = $derived(new Set(variantNights.map((g) => g.stageNum)));
+	let hasNonDefaultSpots = $derived(
+		variantNights.some((g) => selectedVariantOf(g) !== g.variants[0].variant)
+	);
+
+	function selectedVariantOf(group) {
+		const wanted = app.selectedVariants[group.stageNum];
+		return group.variants.some((v) => v.variant === wanted) ? wanted : group.variants[0].variant;
+	}
+
+	// Stages with every night at its preferred spot — the baseline the
+	// tent spot deltas are measured against.
+	let defaultStages = $derived(
+		hasNonDefaultSpots && app.currentTrack
+			? computeStages(app.currentTrack, selectStageWaypoints(app.stageGroups), app.ascentDivisor, app.descentDivisor)
+			: null
+	);
+
+	/**
+	 * Human-readable difference vs the default spots for the two days a
+	 * night's tent spot touches. Only meaningful while day numbering is in
+	 * sync, so bail out if the stage counts diverge (e.g. after a merge).
+	 */
+	function nightDelta(stageNum) {
+		if (!defaultStages || defaultStages.length !== app.stages.length) return null;
+		const parts = [];
+		for (const day of [stageNum, stageNum + 1]) {
+			const cur = app.stages[day - 1];
+			const def = defaultStages[day - 1];
+			if (!cur || !def) continue;
+			const dKm = cur.distance - def.distance;
+			const dUp = cur.ascent - def.ascent;
+			const dTime =
+				walkingTime(cur.distance, cur.ascent, cur.descent, app.baseSpeed, app.ascentRate, app.descentRate) -
+				walkingTime(def.distance, def.ascent, def.descent, app.baseSpeed, app.ascentRate, app.descentRate);
+			const bits = [];
+			if (Math.abs(dKm) >= 0.05) bits.push(`${signed(dKm.toFixed(1))} km`);
+			if (Math.abs(dUp) >= 1) bits.push(`${signed(Math.round(dUp))} hm↑`);
+			if (Math.abs(dTime) >= 1 / 60) bits.push(`${dTime >= 0 ? '+' : '−'}${formatDuration(Math.abs(dTime))} h`);
+			if (bits.length > 0) parts.push(`Day ${day} ${bits.join(' / ')}`);
+		}
+		return parts.length > 0 ? parts.join('  ·  ') : 'no change (same track point)';
+	}
+
+	function signed(v) {
+		return +v >= 0 ? `+${v}` : `−${String(v).slice(1)}`;
 	}
 
 	// All-zero elevation (e.g. failed API fetch) makes ascent/descent, Lkm
@@ -338,6 +417,36 @@
 				</span>
 			</div>
 
+			{#if variantNights.length > 0}
+				<div class="tent-spots">
+					<span class="tent-spots-label">Tent spots</span>
+					<div class="tent-nights">
+						{#each variantNights as group (group.stageNum)}
+							{@const selected = selectedVariantOf(group)}
+							{@const delta = selected !== group.variants[0].variant ? nightDelta(group.stageNum) : null}
+							<div class="tent-night">
+								<span class="tent-night-label">Night {group.stageNum}</span>
+								<span class="tent-chips">
+									{#each group.variants as v (v.variant)}
+										<button
+											class="tent-chip"
+											class:tent-chip--active={v.variant === selected}
+											title={v.name}
+											onclick={() => selectTentSpot(group.stageNum, v.variant)}
+										>
+											{group.stageNum}{v.variant}
+										</button>
+									{/each}
+								</span>
+								{#if delta}
+									<span class="tent-delta">{delta}</span>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			{#if noElevation}
 				<div class="notice" role="status">
 					<span class="notice-icon">!</span>
@@ -376,7 +485,12 @@
 					<tbody>
 						{#each stagesWithTime as stage, i}
 							<tr style="--delay: {i * 30}ms">
-								<td class="day">Day {stage.day}</td>
+								<td class="day">
+									Day {stage.day}
+									{#if stage.endName && nightsWithVariants.has(stage.day)}
+										<span class="day-spot">→ {stage.endName}</span>
+									{/if}
+								</td>
 								<td class="num">{stage.distance.toFixed(1)}</td>
 								<td class="num">{stage.ascent}</td>
 								<td class="num">{stage.descent}</td>
@@ -853,6 +967,82 @@
 		border-color: rgba(212, 113, 154, 0.3);
 	}
 
+	/* ── Tent spots ── */
+
+	.tent-spots {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		margin-bottom: 0.85rem;
+		padding: 0.65rem 0.85rem;
+		border: 1px solid rgba(210, 201, 160, 0.08);
+		border-radius: 10px;
+		background: rgba(210, 201, 160, 0.03);
+	}
+
+	.tent-spots-label {
+		flex-shrink: 0;
+		font-size: 0.9rem;
+		font-weight: 700;
+		color: #7EB77F;
+		padding-top: 0.15rem;
+	}
+
+	.tent-nights {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.tent-night {
+		display: flex;
+		align-items: baseline;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.5rem;
+	}
+
+	.tent-night-label {
+		font-size: 0.85rem;
+		color: rgba(210, 201, 160, 0.5);
+		min-width: 3.9rem;
+	}
+
+	.tent-chips {
+		display: inline-flex;
+		gap: 0.25rem;
+	}
+
+	.tent-chip {
+		padding: 0.18rem 0.55rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		font-family: 'Karla', system-ui, sans-serif;
+		font-variant-numeric: tabular-nums;
+		color: rgba(210, 201, 160, 0.6);
+		background: transparent;
+		border: 1.5px solid rgba(210, 201, 160, 0.12);
+		border-radius: 7px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.tent-chip:hover {
+		color: rgba(210, 201, 160, 0.8);
+		border-color: rgba(210, 201, 160, 0.25);
+	}
+
+	.tent-chip--active {
+		color: #7EB77F;
+		border-color: rgba(126, 183, 127, 0.45);
+		background: rgba(126, 183, 127, 0.08);
+	}
+
+	.tent-delta {
+		font-size: 0.8rem;
+		color: rgba(126, 183, 127, 0.85);
+		font-variant-numeric: tabular-nums;
+	}
+
 	/* ── Table ── */
 
 	.table-wrap {
@@ -887,6 +1077,13 @@
 	.day {
 		font-weight: 600;
 		color: #D2C9A0;
+		white-space: nowrap;
+	}
+
+	.day-spot {
+		font-size: 0.78rem;
+		font-weight: 400;
+		color: rgba(126, 183, 127, 0.75);
 	}
 
 	.num {

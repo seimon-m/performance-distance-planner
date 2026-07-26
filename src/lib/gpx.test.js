@@ -1,5 +1,70 @@
 import { describe, it, expect } from 'vitest';
-import { filterStageWaypoints, compareVariants } from './gpx.js';
+import { filterStageWaypoints, compareVariants, groupStageWaypoints, selectStageWaypoints } from './gpx.js';
+
+describe('groupStageWaypoints', () => {
+	it('groups variants per night, sorted by priority', () => {
+		const waypoints = [
+			{ name: 'T10.1', lon: 21.0, lat: 39.0 },
+			{ name: 'T10.2b', lon: 21.1, lat: 39.1 },
+			{ name: 'T10.2', lon: 21.2, lat: 39.2 },
+			{ name: 'T10.2a', lon: 21.3, lat: 39.3 }
+		];
+
+		const groups = groupStageWaypoints(waypoints);
+
+		expect(groups).toHaveLength(2);
+		expect(groups[0].stageNum).toBe(1);
+		expect(groups[0].variants.map((v) => v.name)).toEqual(['T10.1']);
+		expect(groups[1].stageNum).toBe(2);
+		expect(groups[1].variants.map((v) => v.name)).toEqual(['T10.2', 'T10.2a', 'T10.2b']);
+		expect(groups[1].variants.map((v) => v.variant)).toEqual(['', 'a', 'b']);
+	});
+
+	it('returns empty array when no stage pattern matches', () => {
+		const waypoints = [{ name: 'Stournareika', lon: 21.0, lat: 39.0 }];
+		expect(groupStageWaypoints(waypoints)).toEqual([]);
+	});
+
+	it('excludes other prefixes from groups', () => {
+		const waypoints = [
+			{ name: 'T10.1', lon: 21.0, lat: 39.0 },
+			{ name: 'H10.1', lon: 21.1, lat: 39.1 }
+		];
+
+		const groups = groupStageWaypoints(waypoints);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].variants[0].name).toBe('T10.1');
+	});
+});
+
+describe('selectStageWaypoints', () => {
+	const groups = groupStageWaypoints([
+		{ name: 'T10.1', lon: 21.0, lat: 39.0 },
+		{ name: 'T10.2', lon: 21.1, lat: 39.1 },
+		{ name: 'T10.2a', lon: 21.2, lat: 39.2 },
+		{ name: 'T10.2b', lon: 21.3, lat: 39.3 }
+	]);
+
+	it('defaults to the preferred variant per night', () => {
+		const result = selectStageWaypoints(groups);
+		expect(result.map((wp) => wp.name)).toEqual(['T10.1', 'T10.2']);
+	});
+
+	it('honors an explicit selection', () => {
+		const result = selectStageWaypoints(groups, { 2: 'b' });
+		expect(result.map((wp) => wp.name)).toEqual(['T10.1', 'T10.2b']);
+	});
+
+	it('falls back to preferred variant for unknown selections', () => {
+		const result = selectStageWaypoints(groups, { 2: 'z' });
+		expect(result.map((wp) => wp.name)).toEqual(['T10.1', 'T10.2']);
+	});
+
+	it('returns plain waypoints without variant metadata', () => {
+		const result = selectStageWaypoints(groups, { 2: 'a' });
+		expect(result[1]).toEqual({ name: 'T10.2a', lon: 21.2, lat: 39.2 });
+	});
+});
 
 describe('compareVariants', () => {
 	it('prefers no variant over any letter', () => {
