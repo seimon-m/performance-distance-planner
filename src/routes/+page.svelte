@@ -1,6 +1,6 @@
 <script>
 	import { parseFile } from '$lib/gpx.js';
-	import { computeStages, sortWaypointsAlongTrack } from '$lib/calc.js';
+	import { computeStages, sortWaypointsAlongTrack, walkingTime, formatDuration } from '$lib/calc.js';
 	import { stagesToCSV, downloadCSV } from '$lib/csv.js';
 	import { fetchElevation, hasElevationData, fillElevationGaps, PROVIDERS } from '$lib/elevation.js';
 	import { getAppState } from '$lib/store.svelte.js';
@@ -125,7 +125,7 @@
 	}
 
 	function exportCSV() {
-		const csv = stagesToCSV(app.stages);
+		const csv = stagesToCSV(stagesWithTime);
 		downloadCSV(csv);
 	}
 
@@ -146,6 +146,35 @@
 		recalculate();
 	}
 
+	/**
+	 * Update a walking-time parameter, allowing decimals (e.g. 4.2 km/h)
+	 * but ignoring empty/invalid values to avoid division by zero.
+	 */
+	function setSpeedParam(key, rawValue) {
+		const v = +rawValue;
+		if (!Number.isFinite(v) || v <= 0) return;
+		app[key] = v;
+	}
+
+	// All-zero elevation (e.g. failed API fetch) makes ascent/descent, Lkm
+	// and Time silently misleading — flag it instead.
+	let noElevation = $derived(
+		app.stages.length > 0 && app.currentTrack != null && !hasElevationData(app.currentTrack)
+	);
+
+	// Walking time is derived from the per-stage values, so speed changes
+	// don't need a full track re-walk.
+	let stagesWithTime = $derived(
+		app.stages.map((s) => ({
+			...s,
+			walkingTime: walkingTime(s.distance, s.ascent, s.descent, app.baseSpeed, app.ascentRate, app.descentRate)
+		}))
+	);
+
+	let totalWalkingTime = $derived(
+		stagesWithTime.reduce((sum, s) => sum + s.walkingTime, 0)
+	);
+
 	let totalDistance = $derived(
 		app.stages.reduce((sum, s) => sum + s.distance, 0)
 	);
@@ -160,6 +189,7 @@
 	);
 
 	let densityTooltipOpen = $state(false);
+	let timeTooltipOpen = $state(false);
 </script>
 
 <main>
@@ -264,8 +294,59 @@
 				</button>
 			</div>
 
+			<div class="formula-bar">
+				<span class="formula-label formula-label--time">Time</span>
+				<span class="formula-eq">=</span>
+				<span class="formula-part">Speed <span class="formula-unit"><input
+					id="base-speed"
+					type="number"
+					min="0.1"
+					step="0.1"
+					value={app.baseSpeed}
+					oninput={(e) => setSpeedParam('baseSpeed', e.target.value)}
+				/>km/h</span></span>
+				<span class="formula-op">·</span>
+				<span class="formula-part">Ascent <span class="formula-unit"><input
+					id="ascent-rate"
+					type="number"
+					min="1"
+					step="10"
+					value={app.ascentRate}
+					oninput={(e) => setSpeedParam('ascentRate', e.target.value)}
+				/>m/h</span></span>
+				<span class="formula-op">·</span>
+				<span class="formula-part">Descent <span class="formula-unit"><input
+					id="descent-rate"
+					type="number"
+					min="1"
+					step="10"
+					value={app.descentRate}
+					oninput={(e) => setSpeedParam('descentRate', e.target.value)}
+				/>m/h</span></span>
+				<span class="time-info">
+					<button class="snap-info-btn" onclick={() => timeTooltipOpen = !timeTooltipOpen} aria-label="Walking time formula info">
+						ⓘ
+					</button>
+					{#if timeTooltipOpen}
+						<div class="snap-tooltip snap-tooltip--left">
+							Swiss hiking time formula (SAC / DIN 33466):
+							<br />horizontal time = distance ÷ speed
+							<br />vertical time = ascent ÷ rate + descent ÷ rate
+							<br />total = larger value + half the smaller
+						</div>
+					{/if}
+				</span>
+			</div>
+
+			{#if noElevation}
+				<div class="notice" role="status">
+					<span class="notice-icon">!</span>
+					No elevation data — hm ↑ / hm ↓ are 0, so Lkm and Time only reflect the horizontal distance. Try the other Elevation API.
+				</div>
+			{/if}
+
 			<div class="table-wrap">
-				<table>
+				<table class:table--no-ele={noElevation}>
 					<thead>
 						<tr>
 							<th>Day</th>
@@ -289,10 +370,11 @@
 								{/if}
 							</th>
 							<th class="num">Lkm</th>
+							<th class="num">Time</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each app.stages as stage, i}
+						{#each stagesWithTime as stage, i}
 							<tr style="--delay: {i * 30}ms">
 								<td class="day">Day {stage.day}</td>
 								<td class="num">{stage.distance.toFixed(1)}</td>
@@ -312,6 +394,7 @@
 									{/if}
 								</td>
 								<td class="num lkm">{stage.performanceKm.toFixed(1)}</td>
+								<td class="num time">{formatDuration(stage.walkingTime)}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -323,6 +406,7 @@
 							<td class="num">{totalDescent}</td>
 							<td class="num snap-cell"></td>
 							<td class="num lkm">{totalPerformanceKm.toFixed(1)}</td>
+							<td class="num time">{formatDuration(totalWalkingTime)}</td>
 						</tr>
 					</tfoot>
 				</table>
@@ -335,7 +419,7 @@
 			</div>
 
 			{#if app.stages.length > 1}
-				<StageChart stages={app.stages} />
+				<StageChart stages={stagesWithTime} />
 			{/if}
 
 			{#if app.currentTrack}
@@ -677,6 +761,7 @@
 	}
 
 	.formula-bar {
+		position: relative;
 		display: flex;
 		align-items: baseline;
 		flex-wrap: wrap;
@@ -692,8 +777,16 @@
 		font-size: 0.92rem;
 	}
 
+	.formula-label--time {
+		color: #D4719A;
+	}
+
 	.formula-eq {
 		color: rgba(210, 201, 160, 0.4);
+	}
+
+	.time-info {
+		margin-left: 0.15rem;
 	}
 
 	.formula-part {
@@ -806,6 +899,11 @@
 		font-weight: 600;
 	}
 
+	.time {
+		color: #D4719A;
+		font-weight: 600;
+	}
+
 	tbody tr {
 		transition: background 0.12s;
 		animation: fadeUp 0.25s ease both;
@@ -827,6 +925,23 @@
 
 	tfoot .lkm {
 		color: #FAAD17;
+	}
+
+	tfoot .time {
+		color: #D4719A;
+	}
+
+	/* Without elevation data the hm ↑/↓ (cols 3–4), Lkm (6) and Time (7)
+	   values are misleading — fade them out. */
+	.table--no-ele th:nth-child(3),
+	.table--no-ele td:nth-child(3),
+	.table--no-ele th:nth-child(4),
+	.table--no-ele td:nth-child(4),
+	.table--no-ele th:nth-child(6),
+	.table--no-ele td:nth-child(6),
+	.table--no-ele th:nth-child(7),
+	.table--no-ele td:nth-child(7) {
+		opacity: 0.35;
 	}
 
 	/* ── Snap indicator ── */
@@ -873,6 +988,17 @@
 		color: rgba(210, 201, 160, 0.7);
 		white-space: nowrap;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+	}
+
+	/* Must come after .snap-tooltip so left/right both win the cascade —
+	   otherwise the box gets pinned to both edges of its container.
+	   Anchored to the formula bar (its nearest positioned ancestor),
+	   so it never hangs off-screen on narrow viewports. */
+	.snap-tooltip--left {
+		right: auto;
+		left: 0;
+		white-space: normal;
+		max-width: 100%;
 	}
 
 	.snap-cell {

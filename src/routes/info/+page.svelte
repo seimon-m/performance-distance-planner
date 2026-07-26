@@ -279,9 +279,53 @@
 	</section>
 
 	<section>
-		<h2>8. Export Results</h2>
+		<h2>8. Walking Time</h2>
 		<p>
-			Once calculated, you can export all stage data as a <strong>CSV file</strong> for use in spreadsheets or further planning. The export includes day number, distance, ascent, descent, and performance distance for each stage.
+			The estimated walking time per stage uses the formula behind the times on <strong>Swiss hiking signposts</strong> (SAC, equivalent to DIN 33466). It combines a horizontal and a vertical component:
+		</p>
+
+		<div class="formula-card">
+			<div class="formula-title">Formula</div>
+			<div class="formula-equation">
+				Horizontal = Distance ÷ <span class="highlight">4.2</span> <span class="unit">km/h</span>
+			</div>
+			<div class="formula-equation">
+				Vertical = Ascent ÷ <span class="highlight">300</span> <span class="unit">m/h</span> + Descent ÷ <span class="highlight">500</span> <span class="unit">m/h</span>
+			</div>
+			<div class="formula-equation">
+				Time = larger value + <span class="highlight">½</span> of the smaller
+			</div>
+			<div class="formula-desc">
+				Whichever component takes longer dominates; the other only counts half, because on steep ground you climb and walk at the same time.
+			</div>
+		</div>
+
+		<h3>Example</h3>
+		<p>
+			A stage of <strong>12 km</strong> with <strong>800 m</strong> ascent and <strong>400 m</strong> descent:
+		</p>
+		<div class="formula-card">
+			<div class="formula-equation">
+				Horizontal: 12 ÷ 4.2 ≈ 2:51 h &nbsp;·&nbsp; Vertical: 800 ÷ 300 + 400 ÷ 500 ≈ 3:28 h
+			</div>
+			<div class="formula-equation">
+				Time = 3:28 + 2:51 ÷ 2 ≈ <span class="highlight">4:54 h</span>
+			</div>
+		</div>
+
+		<h3>Adjusting the Pace</h3>
+		<p>
+			All three parameters are adjustable in the planner: the flat <strong>speed</strong> (default 4.2 km/h), the <strong>ascent rate</strong> (default 300 m/h) and the <strong>descent rate</strong> (default 500 m/h). Lower the values for a slower group or a heavy pack — e.g. 3.5 km/h and 250 m/h for a group carrying full trekking gear.
+		</p>
+		<div class="tip">
+			The estimate is pure walking time and does not include breaks. It matches the yellow signpost times for an average hiker on normal trails — technical terrain (T3+) usually takes longer.
+		</div>
+	</section>
+
+	<section>
+		<h2>9. Export Results</h2>
+		<p>
+			Once calculated, you can export all stage data as a <strong>CSV file</strong> for use in spreadsheets or further planning. The export includes day number, distance, ascent, descent, performance distance and walking time for each stage.
 		</p>
 	</section>
 

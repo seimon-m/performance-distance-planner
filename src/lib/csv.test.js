@@ -20,6 +20,19 @@ describe('stagesToCSV', () => {
 		expect(lines.length).toBe(6);
 	});
 
+	it('adds a walking time row when stages carry walkingTime', () => {
+		const stages = [
+			{ day: 1, distance: 12.34, ascent: 456, descent: 320, performanceKm: 16.9, walkingTime: 4.5 },
+			{ day: 2, distance: 8.5, ascent: 200, descent: 150, performanceKm: 10.5, walkingTime: 2.75 }
+		];
+
+		const csv = stagesToCSV(stages);
+		const lines = csv.split('\n');
+
+		expect(lines.length).toBe(7);
+		expect(lines[6]).toBe('Walking Time (h:mm),4:30,2:45,7:15');
+	});
+
 	it('handles empty stages array', () => {
 		const csv = stagesToCSV([]);
 		const lines = csv.split('\n');

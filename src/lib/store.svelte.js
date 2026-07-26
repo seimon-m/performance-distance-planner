@@ -1,4 +1,4 @@
-import { DEFAULT_ASCENT_DIVISOR, DEFAULT_DESCENT_DIVISOR } from './calc.js';
+import { DEFAULT_ASCENT_DIVISOR, DEFAULT_DESCENT_DIVISOR, DEFAULT_BASE_SPEED, DEFAULT_ASCENT_RATE, DEFAULT_DESCENT_RATE } from './calc.js';
 import { DEFAULT_PROVIDER } from './elevation.js';
 
 let stages = $state([]);
@@ -9,6 +9,9 @@ let loading = $state(false);
 let loadingMessage = $state('');
 let ascentDivisor = $state(DEFAULT_ASCENT_DIVISOR);
 let descentDivisor = $state(DEFAULT_DESCENT_DIVISOR);
+let baseSpeed = $state(DEFAULT_BASE_SPEED);
+let ascentRate = $state(DEFAULT_ASCENT_RATE);
+let descentRate = $state(DEFAULT_DESCENT_RATE);
 let currentTrack = $state(null);
 let currentRawTrack = $state(null);
 let currentWaypoints = $state(null);
@@ -33,6 +36,12 @@ export function getAppState() {
 		set ascentDivisor(v) { ascentDivisor = v; },
 		get descentDivisor() { return descentDivisor; },
 		set descentDivisor(v) { descentDivisor = v; },
+		get baseSpeed() { return baseSpeed; },
+		set baseSpeed(v) { baseSpeed = v; },
+		get ascentRate() { return ascentRate; },
+		set ascentRate(v) { ascentRate = v; },
+		get descentRate() { return descentRate; },
+		set descentRate(v) { descentRate = v; },
 		get currentTrack() { return currentTrack; },
 		set currentTrack(v) { currentTrack = v; },
 		get currentRawTrack() { return currentRawTrack; },
