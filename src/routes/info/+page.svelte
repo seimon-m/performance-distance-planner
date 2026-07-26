@@ -113,7 +113,7 @@
 			</div>
 		</div>
 		<p>
-			Nights with several options get a <strong>Tent spots</strong> switcher above the results table. Picking a different spot moves the split point between the two adjacent days and shows the difference against the preferred spot (e.g. "Day 3 +1.3 km / +150 hm↑").
+			Nights with several options get a <strong>⛺ night row</strong> directly in the results table, between the two days the night connects. Picking a different spot moves the split point and updates the day above (↑) and below (↓), with the difference shown against the preferred spot (e.g. "↑ Day 3 +1.3 km / +0:20 h").
 		</p>
 		<div class="tip">
 			A tent spot only affects where the route is <strong>split</strong> — all measurements still follow the track. If an alternative spot lies off the route (side spur, different valley), the extra way to it is not included; the tool warns when a spot is more than 500 m from the track.

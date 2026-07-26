@@ -187,13 +187,28 @@
 
 	// Nights that have more than one tent spot option
 	let variantNights = $derived(app.stageGroups.filter((g) => g.variants.length > 1));
-	let nightsWithVariants = $derived(new Set(variantNights.map((g) => g.stageNum)));
 	let hasNonDefaultSpots = $derived(
-		variantNights.some((g) => selectedVariantOf(g) !== g.variants[0].variant)
+		variantNights.some((g) => selectedVariantOf(g.stageNum) !== g.variants[0].variant)
 	);
 
-	function selectedVariantOf(group) {
-		const wanted = app.selectedVariants[group.stageNum];
+	// Night rows rendered inside the table, keyed by the day they follow.
+	// Chips are ordered by position along the route (not by priority), so
+	// the row reads like the track: earlier spots left, later spots right.
+	let nightGroups = $derived(
+		new Map(
+			variantNights.map((g) => [
+				g.stageNum,
+				app.currentTrack
+					? { ...g, variants: sortWaypointsAlongTrack(g.variants, app.currentTrack) }
+					: g
+			])
+		)
+	);
+
+	function selectedVariantOf(stageNum) {
+		const group = app.stageGroups.find((g) => g.stageNum === stageNum);
+		if (!group) return '';
+		const wanted = app.selectedVariants[stageNum];
 		return group.variants.some((v) => v.variant === wanted) ? wanted : group.variants[0].variant;
 	}
 
@@ -207,8 +222,9 @@
 
 	/**
 	 * Human-readable difference vs the default spots for the two days a
-	 * night's tent spot touches. Only meaningful while day numbering is in
-	 * sync, so bail out if the stage counts diverge (e.g. after a merge).
+	 * night's tent spot touches, one entry per affected day. Only meaningful
+	 * while day numbering is in sync, so bail out if the stage counts
+	 * diverge (e.g. after a merge).
 	 */
 	function nightDelta(stageNum) {
 		if (!defaultStages || defaultStages.length !== app.stages.length) return null;
@@ -226,9 +242,11 @@
 			if (Math.abs(dKm) >= 0.05) bits.push(`${signed(dKm.toFixed(1))} km`);
 			if (Math.abs(dUp) >= 1) bits.push(`${signed(Math.round(dUp))} hm↑`);
 			if (Math.abs(dTime) >= 1 / 60) bits.push(`${dTime >= 0 ? '+' : '−'}${formatDuration(Math.abs(dTime))} h`);
-			if (bits.length > 0) parts.push(`Day ${day} ${bits.join(' / ')}`);
+			// ↑ points at the day row above the night row, ↓ at the one below
+			const arrow = day === stageNum ? '↑' : '↓';
+			if (bits.length > 0) parts.push(`${arrow} Day ${day} ${bits.join(' / ')}`);
 		}
-		return parts.length > 0 ? parts.join('  ·  ') : 'no change (same track point)';
+		return parts.length > 0 ? parts : ['no change (same track point)'];
 	}
 
 	function signed(v) {
@@ -417,36 +435,6 @@
 				</span>
 			</div>
 
-			{#if variantNights.length > 0}
-				<div class="tent-spots">
-					<span class="tent-spots-label">Tent spots</span>
-					<div class="tent-nights">
-						{#each variantNights as group (group.stageNum)}
-							{@const selected = selectedVariantOf(group)}
-							{@const delta = selected !== group.variants[0].variant ? nightDelta(group.stageNum) : null}
-							<div class="tent-night">
-								<span class="tent-night-label">Night {group.stageNum}</span>
-								<span class="tent-chips">
-									{#each group.variants as v (v.variant)}
-										<button
-											class="tent-chip"
-											class:tent-chip--active={v.variant === selected}
-											title={v.name}
-											onclick={() => selectTentSpot(group.stageNum, v.variant)}
-										>
-											{group.stageNum}{v.variant}
-										</button>
-									{/each}
-								</span>
-								{#if delta}
-									<span class="tent-delta">{delta}</span>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
 			{#if noElevation}
 				<div class="notice" role="status">
 					<span class="notice-icon">!</span>
@@ -485,12 +473,7 @@
 					<tbody>
 						{#each stagesWithTime as stage, i}
 							<tr style="--delay: {i * 30}ms">
-								<td class="day">
-									Day {stage.day}
-									{#if stage.endName && nightsWithVariants.has(stage.day)}
-										<span class="day-spot">→ {stage.endName}</span>
-									{/if}
-								</td>
+								<td class="day">Day {stage.day}</td>
 								<td class="num">{stage.distance.toFixed(1)}</td>
 								<td class="num">{stage.ascent}</td>
 								<td class="num">{stage.descent}</td>
@@ -510,6 +493,38 @@
 								<td class="num lkm">{stage.performanceKm.toFixed(1)}</td>
 								<td class="num time">{formatDuration(stage.walkingTime)}</td>
 							</tr>
+							{#if nightGroups.has(stage.day)}
+								{@const group = nightGroups.get(stage.day)}
+								{@const selected = selectedVariantOf(group.stageNum)}
+								{@const defaultVariant = app.stageGroups.find((g) => g.stageNum === group.stageNum)?.variants[0].variant}
+								{@const delta = selected !== defaultVariant ? nightDelta(group.stageNum) : null}
+								<tr class="night-row" style="--delay: {i * 30}ms">
+									<td colspan="7">
+										<div class="night-row-inner">
+											<span class="night-label">⛺ Night {group.stageNum}</span>
+											<span class="night-chips">
+												{#each group.variants as v (v.variant)}
+													<button
+														class="tent-chip"
+														class:tent-chip--active={v.variant === selected}
+														title={v.name}
+														onclick={() => selectTentSpot(group.stageNum, v.variant)}
+													>
+														{group.stageNum}{v.variant}
+													</button>
+												{/each}
+											</span>
+											{#if delta}
+												<span class="night-delta">
+													{#each delta as part}
+														<span>{part}</span>
+													{/each}
+												</span>
+											{/if}
+										</div>
+									</td>
+								</tr>
+							{/if}
 						{/each}
 					</tbody>
 					<tfoot>
@@ -967,49 +982,45 @@
 		border-color: rgba(212, 113, 154, 0.3);
 	}
 
-	/* ── Tent spots ── */
+	/* ── Tent spot night rows ── */
 
-	.tent-spots {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.75rem;
-		margin-bottom: 0.85rem;
-		padding: 0.65rem 0.85rem;
-		border: 1px solid rgba(210, 201, 160, 0.08);
-		border-radius: 10px;
-		background: rgba(210, 201, 160, 0.03);
+	.night-row td {
+		padding: 0.3rem 0.85rem;
+		background: rgba(126, 183, 127, 0.05);
+		border-top: 1px dashed rgba(126, 183, 127, 0.22);
+		border-bottom: 1px dashed rgba(126, 183, 127, 0.22);
 	}
 
-	.tent-spots-label {
-		flex-shrink: 0;
-		font-size: 0.9rem;
-		font-weight: 700;
-		color: #7EB77F;
-		padding-top: 0.15rem;
+	tbody tr.night-row:hover {
+		background: transparent;
 	}
 
-	.tent-nights {
+	.night-row-inner {
 		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-
-	.tent-night {
-		display: flex;
-		align-items: baseline;
+		align-items: center;
 		flex-wrap: wrap;
-		gap: 0.35rem 0.5rem;
+		gap: 0.3rem 0.6rem;
 	}
 
-	.tent-night-label {
-		font-size: 0.85rem;
+	.night-label {
+		font-size: 0.8rem;
 		color: rgba(210, 201, 160, 0.5);
-		min-width: 3.9rem;
+		white-space: nowrap;
 	}
 
-	.tent-chips {
+	.night-chips {
 		display: inline-flex;
 		gap: 0.25rem;
+	}
+
+	.night-delta {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 0.2rem 0.9rem;
+		margin-left: auto;
+		font-size: 0.8rem;
+		color: rgba(126, 183, 127, 0.85);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.tent-chip {
@@ -1035,12 +1046,6 @@
 		color: #7EB77F;
 		border-color: rgba(126, 183, 127, 0.45);
 		background: rgba(126, 183, 127, 0.08);
-	}
-
-	.tent-delta {
-		font-size: 0.8rem;
-		color: rgba(126, 183, 127, 0.85);
-		font-variant-numeric: tabular-nums;
 	}
 
 	/* ── Table ── */
@@ -1078,12 +1083,6 @@
 		font-weight: 600;
 		color: #D2C9A0;
 		white-space: nowrap;
-	}
-
-	.day-spot {
-		font-size: 0.78rem;
-		font-weight: 400;
-		color: rgba(126, 183, 127, 0.75);
 	}
 
 	.num {
