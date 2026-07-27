@@ -196,6 +196,14 @@
 	let variantNightNames = $derived(
 		new Set(variantNights.flatMap((g) => g.variants.map((v) => v.name)))
 	);
+
+	// Non-selected tent spot options, shown as subtle ghost markers on the map
+	let altSpots = $derived(
+		variantNights.flatMap((g) => {
+			const sel = selectedVariantOf(g.stageNum);
+			return g.variants.filter((v) => v.variant !== sel);
+		})
+	);
 	let hasNonDefaultSpots = $derived(
 		variantNights.some((g) => selectedVariantOf(g.stageNum) !== g.variants[0].variant)
 	);
@@ -665,6 +673,7 @@
 						<RouteMap
 							track={app.currentTrack}
 							waypoints={app.currentWaypoints ?? []}
+							altWaypoints={altSpots}
 							onClose={() => showMap = false}
 						/>
 					</div>

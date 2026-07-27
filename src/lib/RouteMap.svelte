@@ -3,7 +3,7 @@
 	import { buildColoredSegments, rampToGradient } from './map-colors.js';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 
-	let { track, waypoints = [], onClose = null } = $props();
+	let { track, waypoints = [], altWaypoints = [], onClose = null } = $props();
 
 	let mapContainer;
 	let map;
@@ -134,6 +134,19 @@
 		for (const marker of markers) marker.remove();
 		markers = [];
 
+		// Ghost markers for non-selected tent spot options first, so the
+		// numbered markers of the selected spots stack above them.
+		for (const wp of altWaypoints) {
+			const el = document.createElement('div');
+			el.className = 'map-alt-marker';
+
+			const marker = new maplibregl.Marker({ element: el })
+				.setLngLat([wp.lon, wp.lat])
+				.setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }).setText(wp.name))
+				.addTo(map);
+			markers.push(marker);
+		}
+
 		for (let i = 0; i < waypoints.length; i++) {
 			const wp = waypoints[i];
 			const el = document.createElement('div');
@@ -152,6 +165,7 @@
 	// the map is open — otherwise it keeps showing the previous selection.
 	$effect(() => {
 		waypoints;
+		altWaypoints;
 		if (mapReady) addWaypointMarkers();
 	});
 
@@ -394,6 +408,16 @@
 		justify-content: center;
 		border: 2px solid rgba(255, 255, 255, 0.8);
 		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+		cursor: pointer;
+	}
+
+	:global(.map-alt-marker) {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: rgba(2, 45, 24, 0.35);
+		border: 2px solid rgba(212, 113, 154, 0.65);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 		cursor: pointer;
 	}
 

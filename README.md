@@ -20,7 +20,7 @@ A client-side web tool that parses GPX/KML files, splits routes into daily stage
 - **Sanity warnings** — missing elevation data fades the affected columns; tent spots more than 500 m off the route are marked amber with an inline note; merged stages (waypoints snapping to the same track point) are reported
 - **CSV export** — transposed layout (rows = metrics, columns = days + Total) including walking time and the chosen tent spot per day, with a `sep=,` hint so Excel parses it correctly in any locale
 - **Stage chart** — dual-axis canvas chart: elevation bars (hm ↑/↓) on the left axis, Lkm line on the right axis, walking time under each day label; dynamic scaling; downloadable as a print-friendly PNG at 4× resolution
-- **Route map** — interactive 3D satellite map with color-coded route (elevation or steepness), waypoint markers that follow the selected tent spots, and terrain toggle; the MapLibre GL bundle is dynamically imported only when the map is revealed, with a static placeholder shown until then
+- **Route map** — interactive 3D satellite map with color-coded route (elevation or steepness), waypoint markers that follow the selected tent spots (alternatives shown as subtle hollow dots), and terrain toggle; the MapLibre GL bundle is dynamically imported only when the map is revealed, with a static placeholder shown until then
 - **Info page** — built-in guide explaining route planning and calculations
 
 ## Performance Distance Formula
