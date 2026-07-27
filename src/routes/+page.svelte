@@ -1,6 +1,6 @@
 <script>
-	import { parseFile } from '$lib/gpx.js';
-	import { computeStages, sortWaypointsAlongTrack, walkingTime, formatDuration } from '$lib/calc.js';
+	import { parseFile, selectStageWaypoints } from '$lib/gpx.js';
+	import { computeStages, sortWaypointsAlongTrack, walkingTime, formatDuration, cumulativeDistances } from '$lib/calc.js';
 	import { stagesToCSV, downloadCSV } from '$lib/csv.js';
 	import { fetchElevation, hasElevationData, fillElevationGaps, PROVIDERS } from '$lib/elevation.js';
 	import { getAppState } from '$lib/store.svelte.js';
@@ -29,10 +29,12 @@
 		try {
 			app.loadingMessage = 'Parsing file…';
 			const text = await file.text();
-			let { track, waypoints } = parseFile(text, file.name);
+			let { track, waypoints, stageGroups } = parseFile(text, file.name);
 
 			app.currentRawTrack = track;
 			app.currentWaypoints = waypoints;
+			app.stageGroups = stageGroups;
+			app.selectedVariants = {};
 
 			if (!hasElevationData(track)) {
 				app.loadingMessage = `Fetching elevation data (${track.length} points)…`;
@@ -48,7 +50,7 @@
 
 			app.currentTrack = fillElevationGaps(track);
 			app.stages = computeStages(app.currentTrack, waypoints, app.ascentDivisor, app.descentDivisor);
-			app.notice = checkWaypointCollisions(app.currentTrack, waypoints);
+			app.notice = checkWaypointNotices(app.currentTrack, waypoints);
 		} catch (err) {
 			app.error = err.message || 'Error processing file.';
 			app.stages = [];
@@ -59,18 +61,51 @@
 	}
 
 	/**
-	 * Warn when two stage waypoints snap to the same track point —
-	 * their stages get silently merged, which is confusing to debug.
+	 * A waypoint this far from the route probably lies on a side spur the
+	 * track doesn't follow — measurements along the track won't reflect it.
 	 */
-	function checkWaypointCollisions(track, waypoints) {
-		if (waypoints.length < 2) return '';
+	const FAR_SNAP_METERS = 500;
+
+	/**
+	 * Warn about waypoint situations that silently skew the results:
+	 * - two stage waypoints snapping to the same track point (stages get merged)
+	 * - waypoints far away from the route (stats around them are unreliable)
+	 *
+	 * Spots on nights with several variants are excluded from the far check —
+	 * they are flagged inline in their night row instead, so toggling spots
+	 * never changes this banner (and never shifts the layout).
+	 */
+	function checkWaypointNotices(track, waypoints) {
+		if (waypoints.length === 0) return '';
 		const sorted = sortWaypointsAlongTrack(waypoints, track);
+		const messages = [];
+
 		const uniqueIndices = new Set(sorted.map((wp) => wp.trackIndex));
 		if (uniqueIndices.size < sorted.length) {
 			const merged = sorted.length - uniqueIndices.size;
-			return `${merged} stage waypoint${merged === 1 ? '' : 's'} snapped to the same track point as another — the affected days were merged into one stage. Check that consecutive waypoints sit at distinct spots along the route.`;
+			messages.push(`${merged} stage waypoint${merged === 1 ? '' : 's'} snapped to the same track point as another — the affected days were merged into one stage. Check that consecutive waypoints sit at distinct spots along the route.`);
 		}
-		return '';
+
+		const far = sorted.filter(
+			(wp) => wp.snapDistance > FAR_SNAP_METERS && !variantNightNames.has(wp.name)
+		);
+		if (far.length > 0) {
+			const names = far.map((wp) => `${wp.name} (${Math.round(wp.snapDistance)} m)`).join(', ');
+			messages.push(`${names} ${far.length === 1 ? 'is' : 'are'} far from the route. All measurements follow the track, so the extra way to ${far.length === 1 ? 'this spot' : 'these spots'} is not included.`);
+		}
+
+		return messages.join(' ');
+	}
+
+	/**
+	 * Pick a different tent spot for a night and redistribute the two
+	 * adjacent days accordingly.
+	 */
+	function selectTentSpot(stageNum, variant) {
+		app.selectedVariants = { ...app.selectedVariants, [stageNum]: variant };
+		app.currentWaypoints = selectStageWaypoints(app.stageGroups, app.selectedVariants);
+		recalculate();
+		app.notice = checkWaypointNotices(app.currentTrack, app.currentWaypoints);
 	}
 
 	async function refetchElevation(provider) {
@@ -154,6 +189,147 @@
 		const v = +rawValue;
 		if (!Number.isFinite(v) || v <= 0) return;
 		app[key] = v;
+	}
+
+	// Nights that have more than one tent spot option
+	let variantNights = $derived(app.stageGroups.filter((g) => g.variants.length > 1));
+	let variantNightNames = $derived(
+		new Set(variantNights.flatMap((g) => g.variants.map((v) => v.name)))
+	);
+
+	// Non-selected tent spot options, shown as ghost markers on the map,
+	// labeled with the same short code as in the night rows (e.g. "4b")
+	let altSpots = $derived(
+		variantNights.flatMap((g) => {
+			const sel = selectedVariantOf(g.stageNum);
+			return g.variants
+				.filter((v) => v.variant !== sel)
+				.map((v) => ({ ...v, label: `${g.stageNum}${v.variant}` }));
+		})
+	);
+	let hasNonDefaultSpots = $derived(
+		variantNights.some((g) => selectedVariantOf(g.stageNum) !== g.variants[0].variant)
+	);
+
+	// Night rows rendered inside the table, keyed by the day they follow.
+	// Chips are ordered by position along the route (not by priority), so
+	// the row reads like the track: earlier spots left, later spots right.
+	let nightGroups = $derived(
+		new Map(
+			variantNights.map((g) => [
+				g.stageNum,
+				app.currentTrack
+					? { ...g, variants: sortWaypointsAlongTrack(g.variants, app.currentTrack) }
+					: g
+			])
+		)
+	);
+
+	function selectedVariantOf(stageNum) {
+		const group = app.stageGroups.find((g) => g.stageNum === stageNum);
+		if (!group) return '';
+		const wanted = app.selectedVariants[stageNum];
+		return group.variants.some((v) => v.variant === wanted) ? wanted : group.variants[0].variant;
+	}
+
+	function selectedNameOf(group) {
+		const sel = selectedVariantOf(group.stageNum);
+		return (group.variants.find((v) => v.variant === sel) ?? group.variants[0]).name;
+	}
+
+	// Cumulative distance along the track and the snap positions of the
+	// currently selected spots — the geometry behind the night track rows.
+	let cumDist = $derived(app.currentTrack ? cumulativeDistances(app.currentTrack) : null);
+	let selectedSnaps = $derived(
+		app.currentTrack && app.currentWaypoints?.length
+			? sortWaypointsAlongTrack(app.currentWaypoints, app.currentTrack)
+			: []
+	);
+
+	function snapIndexOf(name) {
+		return selectedSnaps.find((wp) => wp.name === name)?.trackIndex ?? null;
+	}
+
+	/**
+	 * Spread stop positions (sorted %) so neighbors keep a usable tap
+	 * distance, at the cost of exact proportionality when spots are close.
+	 */
+	function spreadPositions(raw, minGap = 8) {
+		const p = raw.map((v) => Math.min(98, Math.max(2, v)));
+		for (let i = 1; i < p.length; i++) p[i] = Math.max(p[i], p[i - 1] + minGap);
+		if (p[p.length - 1] > 98) {
+			p[p.length - 1] = 98;
+			for (let i = p.length - 2; i >= 0; i--) p[i] = Math.min(p[i], p[i + 1] - minGap);
+		}
+		return p;
+	}
+
+	/**
+	 * Geometry for a night's track visualization: each variant's position
+	 * as a % of the stretch between the neighboring nights' selected spots
+	 * (i.e. from the start of the day above to the end of the day below).
+	 */
+	function nightModel(group) {
+		if (!cumDist) return null;
+		const gi = app.stageGroups.findIndex((g) => g.stageNum === group.stageNum);
+		const prevGroup = app.stageGroups[gi - 1];
+		const nextGroup = app.stageGroups[gi + 1];
+		const startIdx = (prevGroup ? snapIndexOf(selectedNameOf(prevGroup)) : 0) ?? 0;
+		const endIdx = (nextGroup ? snapIndexOf(selectedNameOf(nextGroup)) : cumDist.length - 1) ?? cumDist.length - 1;
+		const span = cumDist[endIdx] - cumDist[startIdx];
+		if (!(span > 0)) return null;
+
+		const raw = group.variants.map((v) => {
+			const idx = Math.min(Math.max(v.trackIndex, startIdx), endIdx);
+			return ((cumDist[idx] - cumDist[startIdx]) / span) * 100;
+		});
+		const pcts = spreadPositions(raw);
+		const selIdx = group.variants.findIndex((v) => v.variant === selectedVariantOf(group.stageNum));
+
+		// Route distance from the selected spot to each alternative — makes
+		// the proportional geometry readable without having to click around.
+		const selTrackIdx = group.variants[selIdx]?.trackIndex;
+		const deltaKms = group.variants.map((v, vi) => {
+			if (vi === selIdx || selTrackIdx == null) return null;
+			const dKm = (cumDist[v.trackIndex] - cumDist[selTrackIdx]) / 1000;
+			return Math.abs(dKm) < 0.05 ? '±0 km' : `${signed(dKm.toFixed(1))} km`;
+		});
+
+		return { pcts, selPct: pcts[selIdx] ?? 50, deltaKms };
+	}
+
+	// Stages with every night at its preferred spot — the baseline the
+	// tent spot deltas are measured against.
+	let defaultStages = $derived(
+		hasNonDefaultSpots && app.currentTrack
+			? computeStages(app.currentTrack, selectStageWaypoints(app.stageGroups), app.ascentDivisor, app.descentDivisor)
+			: null
+	);
+
+	/**
+	 * Human-readable difference vs the default spots for one day. Only
+	 * meaningful while day numbering is in sync, so bail out if the stage
+	 * counts diverge (e.g. after a merge).
+	 */
+	function dayDelta(day) {
+		if (!defaultStages || defaultStages.length !== app.stages.length) return null;
+		const cur = app.stages[day - 1];
+		const def = defaultStages[day - 1];
+		if (!cur || !def) return null;
+		const dKm = cur.distance - def.distance;
+		const dUp = cur.ascent - def.ascent;
+		const dTime =
+			walkingTime(cur.distance, cur.ascent, cur.descent, app.baseSpeed, app.ascentRate, app.descentRate) -
+			walkingTime(def.distance, def.ascent, def.descent, app.baseSpeed, app.ascentRate, app.descentRate);
+		const bits = [];
+		if (Math.abs(dKm) >= 0.05) bits.push(`${signed(dKm.toFixed(1))} km`);
+		if (Math.abs(dUp) >= 1) bits.push(`${signed(Math.round(dUp))} hm↑`);
+		if (Math.abs(dTime) >= 1 / 60) bits.push(`${dTime >= 0 ? '+' : '−'}${formatDuration(Math.abs(dTime))} h`);
+		return bits.length > 0 ? bits.join(' / ') : null;
+	}
+
+	function signed(v) {
+		return +v >= 0 ? `+${v}` : `−${String(v).slice(1)}`;
 	}
 
 	// All-zero elevation (e.g. failed API fetch) makes ascent/descent, Lkm
@@ -396,6 +572,78 @@
 								<td class="num lkm">{stage.performanceKm.toFixed(1)}</td>
 								<td class="num time">{formatDuration(stage.walkingTime)}</td>
 							</tr>
+							{#if nightGroups.has(stage.day)}
+								{@const group = nightGroups.get(stage.day)}
+								{@const selected = selectedVariantOf(group.stageNum)}
+								{@const model = nightModel(group)}
+								{@const nextStage = stagesWithTime[i + 1]}
+								{@const selVariant = group.variants.find((v) => v.variant === selected)}
+								{@const isDefaultSpot = selected === app.stageGroups.find((g) => g.stageNum === group.stageNum)?.variants[0].variant}
+								<tr class="night-row" style="--delay: {i * 30}ms">
+									<td colspan="7">
+										<div class="night-row-inner">
+											<span class="night-label">⛺ Night {group.stageNum}</span>
+											{#if model}
+												<div class="night-track">
+													<div class="night-stops">
+														<span class="night-line night-line--day" style="width: {model.selPct}%"></span>
+														<span class="night-line night-line--rest" style="left: {model.selPct}%"></span>
+														{#each group.variants as v, vi (v.variant)}
+															{@const far = v.snapDistance > FAR_SNAP_METERS}
+															<button
+																class="night-stop"
+																class:night-stop--far={far}
+																style="left: {model.pcts[vi]}%"
+																title={far ? `${v.name} — ${Math.round(v.snapDistance)} m off the route` : v.name}
+																aria-label="Tent spot {v.name}{far ? `, ${Math.round(v.snapDistance)} m off the route` : ''}"
+																onclick={() => selectTentSpot(group.stageNum, v.variant)}
+															>
+																<span class="night-stop-label" class:night-stop-label--active={v.variant === selected}>{group.stageNum}{v.variant}</span>
+																<span class="night-stop-dot" class:night-stop-dot--active={v.variant === selected}></span>
+																{#if model.deltaKms[vi]}
+																	<span class="night-stop-km">{model.deltaKms[vi]}</span>
+																{/if}
+															</button>
+														{/each}
+													</div>
+												{#if !isDefaultSpot && (dayDelta(stage.day) || (nextStage && dayDelta(nextStage.day)))}
+														<div class="night-days">
+															<span class="night-day">
+																{#if dayDelta(stage.day)}
+																	← Day {stage.day} <span class="night-day-delta">{dayDelta(stage.day)}</span>
+																{/if}
+															</span>
+															{#if nextStage && dayDelta(nextStage.day)}
+																<span class="night-day">
+																	<span class="night-day-delta">{dayDelta(nextStage.day)}</span> Day {nextStage.day} →
+																</span>
+															{/if}
+														</div>
+													{/if}
+													{#if selVariant && selVariant.snapDistance > FAR_SNAP_METERS}
+														<div class="night-warning">
+															{selVariant.name} is {Math.round(selVariant.snapDistance)} m from the route. All measurements follow the track, so the extra way to this spot is not included.
+														</div>
+													{/if}
+												</div>
+											{:else}
+												<span class="night-chips">
+													{#each group.variants as v (v.variant)}
+														<button
+															class="tent-chip"
+															class:tent-chip--active={v.variant === selected}
+															title={v.name}
+															onclick={() => selectTentSpot(group.stageNum, v.variant)}
+														>
+															{group.stageNum}{v.variant}
+														</button>
+													{/each}
+												</span>
+											{/if}
+										</div>
+									</td>
+								</tr>
+							{/if}
 						{/each}
 					</tbody>
 					<tfoot>
@@ -428,6 +676,7 @@
 						<RouteMap
 							track={app.currentTrack}
 							waypoints={app.currentWaypoints ?? []}
+							altWaypoints={altSpots}
 							onClose={() => showMap = false}
 						/>
 					</div>
@@ -853,6 +1102,217 @@
 		border-color: rgba(212, 113, 154, 0.3);
 	}
 
+	/* ── Tent spot night rows ── */
+
+	.night-row td {
+		padding: 0.3rem 0.85rem;
+		background: rgba(126, 183, 127, 0.05);
+		border-top: 1px dashed rgba(126, 183, 127, 0.22);
+		border-bottom: 1px dashed rgba(126, 183, 127, 0.22);
+	}
+
+	tbody tr.night-row:hover {
+		background: transparent;
+	}
+
+	.night-row-inner {
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+	}
+
+	.night-label {
+		font-size: 0.8rem;
+		color: rgba(210, 201, 160, 0.5);
+		white-space: nowrap;
+	}
+
+	.night-chips {
+		display: inline-flex;
+		gap: 0.25rem;
+	}
+
+	.night-track {
+		flex: 1;
+		min-width: 300px;
+		padding-top: 0.15rem;
+	}
+
+	.night-stops {
+		position: relative;
+		height: 46px;
+	}
+
+	/* Line center sits at 25.5px; the 11px dots at top 20px share that
+	   center exactly — keep both offsets in sync when tuning. */
+	.night-line {
+		position: absolute;
+		top: 24px;
+		height: 3px;
+		border-radius: 2px;
+	}
+
+	.night-line--day {
+		left: 0;
+		background: rgba(212, 113, 154, 0.55);
+	}
+
+	.night-line--rest {
+		right: 0;
+		background: rgba(210, 201, 160, 0.18);
+	}
+
+	.night-stop {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 34px;
+		transform: translateX(-50%);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+	}
+
+	.night-stop-label {
+		position: absolute;
+		top: 0;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 0.72rem;
+		line-height: 1;
+		font-family: 'Karla', system-ui, sans-serif;
+		font-variant-numeric: tabular-nums;
+		color: rgba(210, 201, 160, 0.55);
+		white-space: nowrap;
+		transition: color 0.15s;
+	}
+
+	.night-stop-km {
+		position: absolute;
+		top: 34px;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 0.68rem;
+		line-height: 1;
+		font-variant-numeric: tabular-nums;
+		color: rgba(210, 201, 160, 0.4);
+		white-space: nowrap;
+		transition: color 0.15s;
+	}
+
+	.night-stop:hover .night-stop-km {
+		color: rgba(210, 201, 160, 0.7);
+	}
+
+	.night-stop:hover .night-stop-label {
+		color: rgba(210, 201, 160, 0.85);
+	}
+
+	.night-stop-label--active {
+		color: #7EB77F;
+		font-weight: 700;
+	}
+
+	.night-stop:hover .night-stop-label--active {
+		color: #7EB77F;
+	}
+
+	.night-stop-dot {
+		position: absolute;
+		top: 20px;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 11px;
+		height: 11px;
+		border-radius: 50%;
+		background: #022D18;
+		border: 2px solid rgba(210, 201, 160, 0.45);
+		transition: border-color 0.15s;
+	}
+
+	.night-stop:hover .night-stop-dot {
+		border-color: rgba(210, 201, 160, 0.8);
+	}
+
+	.night-stop-dot--active {
+		background: #7EB77F;
+		border-color: #7EB77F;
+	}
+
+	/* Spots far off the route are flagged amber, selected or not —
+	   must come after the base/active rules to win the cascade. */
+	.night-stop--far .night-stop-label {
+		color: rgba(250, 173, 23, 0.65);
+	}
+
+	.night-stop--far:hover .night-stop-label {
+		color: rgba(250, 173, 23, 0.9);
+	}
+
+	.night-stop--far .night-stop-dot {
+		border-color: rgba(250, 173, 23, 0.55);
+	}
+
+	.night-stop--far:hover .night-stop-dot {
+		border-color: rgba(250, 173, 23, 0.9);
+	}
+
+	.night-stop--far .night-stop-label--active {
+		color: #FAAD17;
+	}
+
+	.night-stop--far .night-stop-dot--active {
+		background: #FAAD17;
+		border-color: #FAAD17;
+	}
+
+	.night-warning {
+		margin-top: 4px;
+		font-size: 0.76rem;
+		color: rgba(250, 173, 23, 0.85);
+	}
+
+	.night-days {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-top: 3px;
+		font-size: 0.76rem;
+		color: rgba(210, 201, 160, 0.5);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.night-day-delta {
+		color: rgba(126, 183, 127, 0.9);
+		margin: 0 0.25rem;
+	}
+
+	.tent-chip {
+		padding: 0.18rem 0.55rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		font-family: 'Karla', system-ui, sans-serif;
+		font-variant-numeric: tabular-nums;
+		color: rgba(210, 201, 160, 0.6);
+		background: transparent;
+		border: 1.5px solid rgba(210, 201, 160, 0.12);
+		border-radius: 7px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.tent-chip:hover {
+		color: rgba(210, 201, 160, 0.8);
+		border-color: rgba(210, 201, 160, 0.25);
+	}
+
+	.tent-chip--active {
+		color: #7EB77F;
+		border-color: rgba(126, 183, 127, 0.45);
+		background: rgba(126, 183, 127, 0.08);
+	}
+
 	/* ── Table ── */
 
 	.table-wrap {
@@ -887,6 +1347,7 @@
 	.day {
 		font-weight: 600;
 		color: #D2C9A0;
+		white-space: nowrap;
 	}
 
 	.num {

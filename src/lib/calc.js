@@ -22,6 +22,26 @@ export const DEFAULT_ASCENT_RATE = 300; // m of ascent per hour
 export const DEFAULT_DESCENT_RATE = 500; // m of descent per hour
 
 /**
+ * Cumulative geodesic distance (meters) along the track at each point.
+ * cum[0] = 0, cum[last] = total track length.
+ *
+ * @param {Array<[number, number, number?]>} track - [lon, lat, ele?]
+ * @returns {number[]}
+ */
+export function cumulativeDistances(track) {
+	const cum = new Array(track.length).fill(0);
+	for (let i = 1; i < track.length; i++) {
+		cum[i] =
+			cum[i - 1] +
+			getDistance(
+				{ latitude: track[i - 1][1], longitude: track[i - 1][0] },
+				{ latitude: track[i][1], longitude: track[i][0] }
+			);
+	}
+	return cum;
+}
+
+/**
  * Estimate walking time using the SAC/DIN 33466 formula:
  * horizontal time = distance / baseSpeed, vertical time = ascent/ascentRate + descent/descentRate.
  * Total = the larger of the two plus half of the smaller.
@@ -67,7 +87,7 @@ export function formatDuration(hours) {
  *
  * @param {Array<{ name: string, lon: number, lat: number }>} waypoints
  * @param {Array<[number, number, number?]>} track - [lon, lat, ele?]
- * @returns {Array<{ name: string, lon: number, lat: number, trackIndex: number }>}
+ * @returns {Array<{ name: string, lon: number, lat: number, trackIndex: number, snapDistance: number }>}
  */
 export function sortWaypointsAlongTrack(waypoints, track) {
 	const sorted = waypoints.map((wp) => {
@@ -85,7 +105,7 @@ export function sortWaypointsAlongTrack(waypoints, track) {
 			}
 		}
 
-		return { ...wp, trackIndex: bestIndex };
+		return { ...wp, trackIndex: bestIndex, snapDistance: minDist };
 	});
 
 	sorted.sort((a, b) => a.trackIndex - b.trackIndex);
@@ -111,6 +131,14 @@ export function sortWaypointsAlongTrack(waypoints, track) {
  */
 export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_ASCENT_DIVISOR, descentDivisor = DEFAULT_DESCENT_DIVISOR) {
 	const splitIndices = new Set(sortedWaypoints.map((wp) => wp.trackIndex));
+
+	// Waypoint name per split index, so each stage knows where it ends.
+	// On collisions (two waypoints on the same track point) the first along
+	// the track wins — the collision itself is reported separately in the UI.
+	const splitNames = new Map();
+	for (const wp of sortedWaypoints) {
+		if (!splitNames.has(wp.trackIndex)) splitNames.set(wp.trackIndex, wp.name);
+	}
 
 	const stages = [];
 	let stageDistance = 0; // in meters
@@ -150,7 +178,10 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 		// If we reached a split point, close the current stage
 		if (splitIndices.has(i)) {
 			const density = stageSegments > 0 ? Math.round(stageDistance / stageSegments) : 0;
-			stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, density));
+			stages.push({
+				...buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, density),
+				endName: splitNames.get(i) ?? null
+			});
 			dayNumber++;
 			stageDistance = 0;
 			stageAscent = 0;
@@ -159,10 +190,13 @@ export function calculateStages(track, sortedWaypoints, ascentDivisor = DEFAULT_
 		}
 	}
 
-	// Final stage: from last split to end of track
+	// Final stage: from last split to end of track (no overnight spot at the end)
 	if (stageDistance > 0 || stageAscent > 0 || stageDescent > 0) {
 		const density = stageSegments > 0 ? Math.round(stageDistance / stageSegments) : 0;
-		stages.push(buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, density));
+		stages.push({
+			...buildStage(dayNumber, stageDistance, stageAscent, stageDescent, ascentDivisor, descentDivisor, density),
+			endName: null
+		});
 	}
 
 	return stages;

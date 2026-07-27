@@ -33,7 +33,26 @@ export function stagesToCSV(stages) {
 		rows.push(['Walking Time (h:mm)', ...stages.map((s) => formatDuration(s.walkingTime ?? 0)), formatDuration(totalTime)].join(','));
 	}
 
+	// Which overnight spot each day ends at — matters when a night has
+	// several tent spot variants, so the export isn't ambiguous.
+	if (stages.some((s) => s.endName)) {
+		rows.push(['Tent Spot', ...stages.map((s) => csvEscape(s.endName ?? '—')), ''].join(','));
+	}
+
 	return rows.join('\n');
+}
+
+/**
+ * Quote a CSV field if it contains a comma, quote, or newline.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function csvEscape(value) {
+	if (/[",\n]/.test(value)) {
+		return `"${value.replaceAll('"', '""')}"`;
+	}
+	return value;
 }
 
 /**

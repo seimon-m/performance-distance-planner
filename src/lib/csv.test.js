@@ -33,6 +33,19 @@ describe('stagesToCSV', () => {
 		expect(lines[6]).toBe('Walking Time (h:mm),4:30,2:45,7:15');
 	});
 
+	it('adds a tent spot row when stages carry endName, escaping commas', () => {
+		const stages = [
+			{ day: 1, distance: 12.34, ascent: 456, descent: 320, performanceKm: 16.9, endName: 'T12.1a' },
+			{ day: 2, distance: 8.5, ascent: 200, descent: 150, performanceKm: 10.5, endName: null }
+		];
+
+		const csv = stagesToCSV(stages);
+		const lines = csv.split('\n');
+
+		expect(lines.length).toBe(7);
+		expect(lines[6]).toBe('Tent Spot,T12.1a,—,');
+	});
+
 	it('handles empty stages array', () => {
 		const csv = stagesToCSV([]);
 		const lines = csv.split('\n');

@@ -80,11 +80,19 @@ function extractFromGeoJSON(geojson) {
 		throw new Error('No track found in file.');
 	}
 
-	// Filter to stage waypoints only, picking preferred variants
-	// If no waypoints exist, the entire track becomes a single stage
-	const waypoints = allWaypoints.length > 0 ? filterStageWaypoints(allWaypoints) : [];
+	// Group stage waypoints by night, keeping all tent spot variants,
+	// and default to the preferred variant per night.
+	// If no waypoints exist, the entire track becomes a single stage.
+	const stageGroups = allWaypoints.length > 0 ? groupStageWaypoints(allWaypoints) : [];
+	let waypoints = [];
+	if (stageGroups.length > 0) {
+		waypoints = selectStageWaypoints(stageGroups);
+	} else if (allWaypoints.length > 0) {
+		// No stage pattern found — fall back to all waypoints
+		waypoints = allWaypoints;
+	}
 
-	return { track, waypoints };
+	return { track, waypoints, stageGroups };
 }
 
 /**
@@ -132,20 +140,22 @@ export function extractWaypoints(geojson) {
 const STAGE_WAYPOINT_REGEX = /^([A-Za-z]+\d+)\.(\d+)(?:[_]?([a-zA-Z]))?$/;
 
 /**
- * Filter waypoints to only include stage/overnight waypoints.
+ * Group stage/overnight waypoints by stage number, keeping all tent spot
+ * variants per night.
  *
  * Logic:
  * 1. Detect all waypoints matching the stage pattern (e.g. T10.1, T10.3a)
  * 2. Auto-detect the most common prefix (e.g. "T10")
- * 3. Group by stage number
- * 4. For each group, pick the preferred variant:
+ * 3. Group by stage number; sort each group's variants by priority:
  *    - No letter suffix has highest priority (e.g. T10.6 over T10.6a)
  *    - Then alphabetical: a > b > c > ...
  *
+ * Returns [] when no waypoint matches the stage pattern.
+ *
  * @param {Array<{ name: string, lon: number, lat: number }>} waypoints
- * @returns {Array<{ name: string, lon: number, lat: number }>}
+ * @returns {Array<{ stageNum: number, variants: Array<{ name: string, lon: number, lat: number, variant: string }> }>}
  */
-export function filterStageWaypoints(waypoints) {
+export function groupStageWaypoints(waypoints) {
 	// Parse all waypoints that match the stage pattern
 	const parsed = [];
 	for (const wp of waypoints) {
@@ -161,8 +171,7 @@ export function filterStageWaypoints(waypoints) {
 	}
 
 	if (parsed.length === 0) {
-		// No stage waypoints found — return all waypoints as fallback
-		return waypoints;
+		return [];
 	}
 
 	// Auto-detect prefix: prefer prefixes starting with 'T' (Team).
@@ -176,22 +185,55 @@ export function filterStageWaypoints(waypoints) {
 	const tPrefix = allPrefixes.find(([p]) => p.startsWith('T'));
 	const detectedPrefix = tPrefix ? tPrefix[0] : allPrefixes[0][0];
 
-	// Filter to only the detected prefix
-	const withPrefix = parsed.filter((p) => p.prefix === detectedPrefix);
-
-	// Group by stage number, pick best variant per group
+	// Group by stage number, keeping every variant
 	const groups = new Map();
-	for (const wp of withPrefix) {
-		const existing = groups.get(wp.stageNum);
-		if (!existing || compareVariants(wp.variant, existing.variant) < 0) {
-			groups.set(wp.stageNum, wp);
-		}
+	for (const wp of parsed) {
+		if (wp.prefix !== detectedPrefix) continue;
+		const { prefix, stageNum, ...variantWp } = wp;
+		if (!groups.has(stageNum)) groups.set(stageNum, []);
+		groups.get(stageNum).push(variantWp);
 	}
 
-	// Return sorted by stage number
-	return [...groups.values()]
-		.sort((a, b) => a.stageNum - b.stageNum)
-		.map(({ prefix, stageNum, variant, ...wp }) => wp);
+	return [...groups.entries()]
+		.sort((a, b) => a[0] - b[0])
+		.map(([stageNum, variants]) => ({
+			stageNum,
+			variants: variants.sort((a, b) => compareVariants(a.variant, b.variant))
+		}));
+}
+
+/**
+ * Resolve stage groups to one waypoint per night.
+ *
+ * @param {Array<{ stageNum: number, variants: Array<{ name: string, lon: number, lat: number, variant: string }> }>} stageGroups
+ * @param {Record<number, string>} [selection] - stageNum → variant letter ('' = unsuffixed).
+ *   Nights without an entry (or with an unknown variant) fall back to the preferred variant.
+ * @returns {Array<{ name: string, lon: number, lat: number }>}
+ */
+export function selectStageWaypoints(stageGroups, selection = {}) {
+	return stageGroups.map((group) => {
+		const wanted = selection[group.stageNum];
+		const chosen =
+			(wanted != null && group.variants.find((v) => v.variant === wanted)) || group.variants[0];
+		const { variant, ...wp } = chosen;
+		return wp;
+	});
+}
+
+/**
+ * Filter waypoints to only include stage/overnight waypoints,
+ * picking the preferred tent spot variant per night.
+ *
+ * @param {Array<{ name: string, lon: number, lat: number }>} waypoints
+ * @returns {Array<{ name: string, lon: number, lat: number }>}
+ */
+export function filterStageWaypoints(waypoints) {
+	const stageGroups = groupStageWaypoints(waypoints);
+	if (stageGroups.length === 0) {
+		// No stage waypoints found — return all waypoints as fallback
+		return waypoints;
+	}
+	return selectStageWaypoints(stageGroups);
 }
 
 /**

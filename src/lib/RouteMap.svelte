@@ -3,16 +3,41 @@
 	import { buildColoredSegments, rampToGradient } from './map-colors.js';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 
-	let { track, waypoints = [], onClose = null } = $props();
+	let { track, waypoints = [], altWaypoints = [], onClose = null } = $props();
 
 	let mapContainer;
 	let map;
+	let maplibregl;
+	let markers = [];
 	let destroyed = false;
+	let mapReady = $state(false);
+	let styleReady = $state(false);
 	let mode = $state('elevation');
 	let showInfo = $state(false);
 
+	// MapLibre never retries errored tiles on its own — a transient tile
+	// failure (throttling, network hiccup) stays blank until the source is
+	// reloaded. Retry a few times with backoff, then give up.
+	const tileRetries = new Map();
+
+	function scheduleTileRetry(sourceId) {
+		const state = tileRetries.get(sourceId) ?? { count: 0, pending: false };
+		if (state.pending || state.count >= 3) return;
+		state.pending = true;
+		state.count += 1;
+		tileRetries.set(sourceId, state);
+		setTimeout(() => {
+			state.pending = false;
+			if (destroyed) return;
+			const source = map?.getSource(sourceId);
+			// setTiles with the same URLs is the public way to force a
+			// re-request of errored tiles on raster sources.
+			if (source?.setTiles && source.tiles) source.setTiles([...source.tiles]);
+		}, 1500 * state.count);
+	}
+
 	onMount(async () => {
-		const maplibregl = await import('maplibre-gl');
+		maplibregl = await import('maplibre-gl');
 		// Component may have been destroyed while the bundle was loading
 		if (destroyed) return;
 
@@ -46,6 +71,13 @@
 				},
 				layers: [
 					{
+						// Shown wherever imagery tiles are missing or still loading —
+						// without it, gaps expose the page background through the canvas.
+						id: 'background',
+						type: 'background',
+						paint: { 'background-color': '#2a3529' }
+					},
+					{
 						id: 'satellite',
 						type: 'raster',
 						source: 'satellite',
@@ -65,10 +97,21 @@
 			fitBoundsOptions: { padding: 40 },
 			pitch: 45,
 			maxPitch: 85,
-			maxZoom: 17
+			maxZoom: 17,
+			// Let tiles from previous zoom levels finish loading during a
+			// fast zoom instead of canceling them — fewer blank patches.
+			cancelPendingTileRequestsWhileZooming: false
 		});
 
 		map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+		map.on('error', (e) => {
+			if (e.sourceId && e.tile) scheduleTileRetry(e.sourceId);
+		});
+
+		// Markers are DOM overlays independent of the style, so they can be
+		// placed right away — no need to wait for tiles to load.
+		mapReady = true;
 
 		map.on('load', () => {
 			map.addSource('terrain-dem', {
@@ -79,15 +122,22 @@
 				maxzoom: 15
 			});
 
-			map.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 });
-
 			map.addControl(
 				new maplibregl.TerrainControl({ source: 'terrain-dem', exaggeration: 1.5 }),
 				'top-right'
 			);
 
-			addRouteLayer();
-			addWaypointMarkers(maplibregl);
+			// Enable 3D terrain only once the DEM for the initial view has
+			// loaded — setting it while elevation data is still streaming in
+			// makes the camera jump and zooms snap back to lower levels
+			// (maplibre-gl-js#4688).
+			map.once('idle', () => {
+				if (!destroyed && !map.getTerrain()) {
+					map.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 });
+				}
+			});
+
+			styleReady = true;
 		});
 	});
 
@@ -122,8 +172,34 @@
 		});
 	}
 
-	function addWaypointMarkers(maplibregl) {
-		if (!map || waypoints.length === 0) return;
+	function addWaypointMarkers() {
+		if (!map) return;
+
+		for (const marker of markers) marker.remove();
+		markers = [];
+
+		// Ghost markers for non-selected tent spot options first, so the
+		// numbered markers of the selected spots stack above them. They are
+		// purely informational: label always visible, no popup, clicks pass
+		// through to the map.
+		// opacityWhenCovered: '1' keeps spots fully visible even when 3D
+		// terrain occludes them — the default fade to 0.2 also kicks in
+		// wrongly on initial load, before the terrain depth data is ready.
+		const markerOpts = { opacity: '1', opacityWhenCovered: '1' };
+
+		for (const wp of altWaypoints) {
+			const el = document.createElement('div');
+			el.className = 'map-alt-marker';
+			const label = document.createElement('span');
+			label.className = 'map-alt-marker-label';
+			label.textContent = wp.label ?? wp.name;
+			el.appendChild(label);
+
+			const marker = new maplibregl.Marker({ element: el, ...markerOpts })
+				.setLngLat([wp.lon, wp.lat])
+				.addTo(map);
+			markers.push(marker);
+		}
 
 		for (let i = 0; i < waypoints.length; i++) {
 			const wp = waypoints[i];
@@ -131,17 +207,34 @@
 			el.className = 'map-waypoint-marker';
 			el.textContent = i + 1;
 
-			new maplibregl.Marker({ element: el })
+			const marker = new maplibregl.Marker({ element: el, ...markerOpts })
 				.setLngLat([wp.lon, wp.lat])
 				.setPopup(new maplibregl.Popup({ offset: 20, closeButton: false }).setText(wp.name))
 				.addTo(map);
+			markers.push(marker);
 		}
 	}
 
+	// Re-place the markers whenever the selected tent spots change while
+	// the map is open — otherwise it keeps showing the previous selection.
+	$effect(() => {
+		waypoints;
+		altWaypoints;
+		if (mapReady) addWaypointMarkers();
+	});
+
 	function switchMode(newMode) {
 		mode = newMode;
-		addRouteLayer();
 	}
+
+	// Rebuild the route layer when the style is ready and whenever the
+	// track (e.g. elevation refetch while the map is open) or the color
+	// mode changes — otherwise the line and the legend drift apart.
+	$effect(() => {
+		track;
+		mode;
+		if (styleReady) addRouteLayer();
+	});
 
 	let legendData = $derived(buildColoredSegments(track, mode).legend);
 	let gradientCSS = $derived(rampToGradient(legendData.ramp));
@@ -378,6 +471,33 @@
 		border: 2px solid rgba(255, 255, 255, 0.8);
 		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 		cursor: pointer;
+	}
+
+	/* No position property here — MapLibre's own .maplibregl-marker class
+	   must keep position:absolute, or markers drift out of geo-sync. */
+	:global(.map-alt-marker) {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: rgba(2, 45, 24, 0.55);
+		border: 3px solid #D4719A;
+		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.3);
+		pointer-events: none;
+	}
+
+	:global(.map-alt-marker-label) {
+		position: absolute;
+		left: calc(100% + 6px);
+		top: 50%;
+		transform: translateY(-50%);
+		font-size: 0.7rem;
+		font-weight: 700;
+		font-family: 'Karla', system-ui, sans-serif;
+		color: #fff;
+		background: rgba(2, 45, 24, 0.7);
+		padding: 1px 6px;
+		border-radius: 5px;
+		white-space: nowrap;
 	}
 
 	:global(.maplibregl-popup-content) {
