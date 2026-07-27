@@ -113,10 +113,10 @@
 			</div>
 		</div>
 		<p>
-			Nights with several options get a <strong>⛺ night row</strong> directly in the results table, between the two days the night connects. The spots sit on a mini route line at their real position along the track, each labeled with its route distance from the selected spot — picking one moves the split point, and each side shows the resulting day (distance and walking time) plus the difference against the preferred spot.
+			Nights with several options get a <strong>⛺ night row</strong> directly in the results table, between the two days the night connects. The spots sit on a mini route line at their real position along the track, each labeled with its route distance from the selected spot. Picking one moves the split point, updates the day above and below, and shows the difference against the preferred spot (distance, ascent and walking time) on the side it belongs to.
 		</p>
 		<div class="tip">
-			A tent spot only affects where the route is <strong>split</strong> — all measurements still follow the track. If an alternative spot lies off the route (side spur, different valley), the extra way to it is not included; spots more than 500 m from the track are marked <strong>amber</strong> in their night row.
+			A tent spot only affects where the route is <strong>split</strong> — all measurements still follow the track. If an alternative spot lies off the route (side spur, different valley), the extra way to it is not included. Spots more than 500 m from the track are marked <strong>amber</strong> in their night row, and selecting one shows a note with its distance from the route.
 		</div>
 
 		<div class="tip">
@@ -331,7 +331,7 @@
 	<section>
 		<h2>9. Export Results</h2>
 		<p>
-			Once calculated, you can export all stage data as a <strong>CSV file</strong> for use in spreadsheets or further planning. The export includes day number, distance, ascent, descent, performance distance and walking time for each stage.
+			Once calculated, you can export all stage data as a <strong>CSV file</strong> for use in spreadsheets or further planning. The export includes day number, distance, ascent, descent, performance distance, walking time and the chosen tent spot for each stage — so the file always records which spot variants it was calculated with.
 		</p>
 	</section>
 
