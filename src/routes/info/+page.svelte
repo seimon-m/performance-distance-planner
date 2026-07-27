@@ -184,34 +184,41 @@
 			Google Earth Pro does not include usable elevation data when exporting paths. Coordinates are typically stored as "clamped to ground" with an altitude of 0.
 		</p>
 		<p>
-			To calculate ascent and descent, the tool automatically fetches real elevation data from a third-party API. You can switch between two providers using the <strong>Elevation API</strong> toggle on the main page.
+			To calculate ascent and descent, the tool automatically fetches real elevation data from a third-party source. You can switch between three providers using the <strong>Elevation API</strong> toggle on the main page.
 		</p>
 
-		<h3>Open-Elevation (default)</h3>
+		<h3>Terrain Tiles (default)</h3>
+		<ul>
+			<li>Based on the <strong>AWS terrarium</strong> elevation tiles (~30 m resolution, global coverage — the same data the 3D route map uses)</li>
+			<li>Tiles are fetched in parallel and decoded <strong>directly in your browser</strong> — no API server involved, so it's fast and has no rate limits</li>
+		</ul>
+
+		<h3>Open-Elevation</h3>
 		<ul>
 			<li>Based on <strong>SRTM</strong> datasets with ~30 m resolution</li>
+			<li>Only covers latitudes <strong>56°S–60°N</strong> — routes further north (e.g. northern Scandinavia) need a different provider</li>
 			<li>All coordinates are sent in a <strong>single POST request</strong></li>
 			<li>Free and open-source, but may occasionally be down</li>
 		</ul>
 
-		<h3>Open-Meteo (fallback)</h3>
+		<h3>Open-Meteo</h3>
 		<ul>
-			<li>Based on <strong>Copernicus DEM</strong> with ~90 m resolution</li>
+			<li>Based on <strong>Copernicus DEM</strong> with ~90 m resolution, global coverage</li>
 			<li>Coordinates are sent in <strong>batched GET requests</strong> (50 points per batch, 3 s delay)</li>
 			<li>Free, no API key required</li>
 		</ul>
 
 		<p>
-			Both providers automatically <strong>retry with backoff</strong> if a request fails (e.g. rate limit or server error). If one API isn't working, switch to the other and try again.
+			All providers automatically <strong>retry with backoff</strong> if a request fails (e.g. rate limit or server error). If one isn't working, switch to another and try again.
 		</p>
 
 		<div class="tip">
-			The elevation lookup may take a few seconds depending on route length and API load. Open-Meteo is generally more reliable; Open-Elevation offers higher resolution but may have downtime.
+			The elevation lookup may take a few seconds depending on route length and API load. Terrain Tiles is the fastest and works everywhere; Open-Elevation and Open-Meteo are handy alternatives for cross-checking results.
 		</div>
 
 		<h3>Privacy</h3>
 		<p>
-			Everything runs in your browser — uploaded files are <strong>never stored on a server</strong>. To fetch elevation data, your route's coordinates are sent to the selected elevation API (Open-Elevation or Open-Meteo), and the optional route map loads satellite and terrain tiles from Esri and AWS. No account, no cookies, no tracking of personal data.
+			Everything runs in your browser — uploaded files are <strong>never stored on a server</strong>. To fetch elevation data, your route's coordinates are sent to the selected elevation API (Open-Elevation or Open-Meteo) or used to load elevation tiles from AWS (Terrain Tiles), and the optional route map loads satellite and terrain tiles from Esri and AWS. No account, no cookies, no tracking of personal data.
 		</p>
 	</section>
 
