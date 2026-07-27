@@ -416,8 +416,9 @@
 		cursor: pointer;
 	}
 
+	/* No position property here — MapLibre's own .maplibregl-marker class
+	   must keep position:absolute, or markers drift out of geo-sync. */
 	:global(.map-alt-marker) {
-		position: relative;
 		width: 16px;
 		height: 16px;
 		border-radius: 50%;
