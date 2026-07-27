@@ -582,22 +582,20 @@
 															</button>
 														{/each}
 													</div>
-													<div class="night-days">
-														<span class="night-day">
-															← Day {stage.day} · {stage.distance.toFixed(1)} km · {formatDuration(stage.walkingTime)} h
-															{#if dayDelta(stage.day)}
-																<span class="night-day-delta">{dayDelta(stage.day)}</span>
-															{/if}
-														</span>
-														{#if nextStage}
+												{#if dayDelta(stage.day) || (nextStage && dayDelta(nextStage.day))}
+														<div class="night-days">
 															<span class="night-day">
-																{#if dayDelta(nextStage.day)}
-																	<span class="night-day-delta">{dayDelta(nextStage.day)}</span>
+																{#if dayDelta(stage.day)}
+																	← Day {stage.day} <span class="night-day-delta">{dayDelta(stage.day)}</span>
 																{/if}
-																Day {nextStage.day} · {nextStage.distance.toFixed(1)} km · {formatDuration(nextStage.walkingTime)} h →
 															</span>
-														{/if}
-													</div>
+															{#if nextStage && dayDelta(nextStage.day)}
+																<span class="night-day">
+																	<span class="night-day-delta">{dayDelta(nextStage.day)}</span> Day {nextStage.day} →
+																</span>
+															{/if}
+														</div>
+													{/if}
 												</div>
 											{:else}
 												<span class="night-chips">
