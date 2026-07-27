@@ -412,12 +412,12 @@
 	}
 
 	:global(.map-alt-marker) {
-		width: 12px;
-		height: 12px;
+		width: 16px;
+		height: 16px;
 		border-radius: 50%;
-		background: rgba(2, 45, 24, 0.35);
-		border: 2px solid rgba(212, 113, 154, 0.65);
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+		background: rgba(2, 45, 24, 0.55);
+		border: 3px solid #D4719A;
+		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.3);
 		cursor: pointer;
 	}
 
