@@ -7,12 +7,15 @@
 
 	let mapContainer;
 	let map;
+	let maplibregl;
+	let markers = [];
 	let destroyed = false;
+	let mapReady = $state(false);
 	let mode = $state('elevation');
 	let showInfo = $state(false);
 
 	onMount(async () => {
-		const maplibregl = await import('maplibre-gl');
+		maplibregl = await import('maplibre-gl');
 		// Component may have been destroyed while the bundle was loading
 		if (destroyed) return;
 
@@ -70,6 +73,10 @@
 
 		map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
 
+		// Markers are DOM overlays independent of the style, so they can be
+		// placed right away — no need to wait for tiles to load.
+		mapReady = true;
+
 		map.on('load', () => {
 			map.addSource('terrain-dem', {
 				type: 'raster-dem',
@@ -87,7 +94,6 @@
 			);
 
 			addRouteLayer();
-			addWaypointMarkers(maplibregl);
 		});
 	});
 
@@ -122,8 +128,11 @@
 		});
 	}
 
-	function addWaypointMarkers(maplibregl) {
-		if (!map || waypoints.length === 0) return;
+	function addWaypointMarkers() {
+		if (!map) return;
+
+		for (const marker of markers) marker.remove();
+		markers = [];
 
 		for (let i = 0; i < waypoints.length; i++) {
 			const wp = waypoints[i];
@@ -131,12 +140,20 @@
 			el.className = 'map-waypoint-marker';
 			el.textContent = i + 1;
 
-			new maplibregl.Marker({ element: el })
+			const marker = new maplibregl.Marker({ element: el })
 				.setLngLat([wp.lon, wp.lat])
 				.setPopup(new maplibregl.Popup({ offset: 20, closeButton: false }).setText(wp.name))
 				.addTo(map);
+			markers.push(marker);
 		}
 	}
+
+	// Re-place the markers whenever the selected tent spots change while
+	// the map is open — otherwise it keeps showing the previous selection.
+	$effect(() => {
+		waypoints;
+		if (mapReady) addWaypointMarkers();
+	});
 
 	function switchMode(newMode) {
 		mode = newMode;
