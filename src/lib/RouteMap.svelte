@@ -135,14 +135,19 @@
 		markers = [];
 
 		// Ghost markers for non-selected tent spot options first, so the
-		// numbered markers of the selected spots stack above them.
+		// numbered markers of the selected spots stack above them. They are
+		// purely informational: label always visible, no popup, clicks pass
+		// through to the map.
 		for (const wp of altWaypoints) {
 			const el = document.createElement('div');
 			el.className = 'map-alt-marker';
+			const label = document.createElement('span');
+			label.className = 'map-alt-marker-label';
+			label.textContent = wp.label ?? wp.name;
+			el.appendChild(label);
 
 			const marker = new maplibregl.Marker({ element: el })
 				.setLngLat([wp.lon, wp.lat])
-				.setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }).setText(wp.name))
 				.addTo(map);
 			markers.push(marker);
 		}
@@ -412,13 +417,29 @@
 	}
 
 	:global(.map-alt-marker) {
+		position: relative;
 		width: 16px;
 		height: 16px;
 		border-radius: 50%;
 		background: rgba(2, 45, 24, 0.55);
 		border: 3px solid #D4719A;
 		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.3);
-		cursor: pointer;
+		pointer-events: none;
+	}
+
+	:global(.map-alt-marker-label) {
+		position: absolute;
+		left: calc(100% + 6px);
+		top: 50%;
+		transform: translateY(-50%);
+		font-size: 0.7rem;
+		font-weight: 700;
+		font-family: 'Karla', system-ui, sans-serif;
+		color: #fff;
+		background: rgba(2, 45, 24, 0.7);
+		padding: 1px 6px;
+		border-radius: 5px;
+		white-space: nowrap;
 	}
 
 	:global(.maplibregl-popup-content) {

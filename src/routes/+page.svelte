@@ -197,11 +197,14 @@
 		new Set(variantNights.flatMap((g) => g.variants.map((v) => v.name)))
 	);
 
-	// Non-selected tent spot options, shown as subtle ghost markers on the map
+	// Non-selected tent spot options, shown as ghost markers on the map,
+	// labeled with the same short code as in the night rows (e.g. "4b")
 	let altSpots = $derived(
 		variantNights.flatMap((g) => {
 			const sel = selectedVariantOf(g.stageNum);
-			return g.variants.filter((v) => v.variant !== sel);
+			return g.variants
+				.filter((v) => v.variant !== sel)
+				.map((v) => ({ ...v, label: `${g.stageNum}${v.variant}` }));
 		})
 	);
 	let hasNonDefaultSpots = $derived(
