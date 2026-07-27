@@ -70,6 +70,10 @@
 	 * Warn about waypoint situations that silently skew the results:
 	 * - two stage waypoints snapping to the same track point (stages get merged)
 	 * - waypoints far away from the route (stats around them are unreliable)
+	 *
+	 * Spots on nights with several variants are excluded from the far check —
+	 * they are flagged inline in their night row instead, so toggling spots
+	 * never changes this banner (and never shifts the layout).
 	 */
 	function checkWaypointNotices(track, waypoints) {
 		if (waypoints.length === 0) return '';
@@ -82,7 +86,9 @@
 			messages.push(`${merged} stage waypoint${merged === 1 ? '' : 's'} snapped to the same track point as another — the affected days were merged into one stage. Check that consecutive waypoints sit at distinct spots along the route.`);
 		}
 
-		const far = sorted.filter((wp) => wp.snapDistance > FAR_SNAP_METERS);
+		const far = sorted.filter(
+			(wp) => wp.snapDistance > FAR_SNAP_METERS && !variantNightNames.has(wp.name)
+		);
 		if (far.length > 0) {
 			const names = far.map((wp) => `${wp.name} (${Math.round(wp.snapDistance)} m)`).join(', ');
 			messages.push(`${names} ${far.length === 1 ? 'is' : 'are'} far from the route. All measurements follow the track, so the extra way to ${far.length === 1 ? 'this spot' : 'these spots'} is not included.`);
@@ -187,6 +193,9 @@
 
 	// Nights that have more than one tent spot option
 	let variantNights = $derived(app.stageGroups.filter((g) => g.variants.length > 1));
+	let variantNightNames = $derived(
+		new Set(variantNights.flatMap((g) => g.variants.map((v) => v.name)))
+	);
 	let hasNonDefaultSpots = $derived(
 		variantNights.some((g) => selectedVariantOf(g.stageNum) !== g.variants[0].variant)
 	);
@@ -557,6 +566,8 @@
 								{@const selected = selectedVariantOf(group.stageNum)}
 								{@const model = nightModel(group)}
 								{@const nextStage = stagesWithTime[i + 1]}
+								{@const selVariant = group.variants.find((v) => v.variant === selected)}
+								{@const isDefaultSpot = selected === app.stageGroups.find((g) => g.stageNum === group.stageNum)?.variants[0].variant}
 								<tr class="night-row" style="--delay: {i * 30}ms">
 									<td colspan="7">
 										<div class="night-row-inner">
@@ -567,11 +578,13 @@
 														<span class="night-line night-line--day" style="width: {model.selPct}%"></span>
 														<span class="night-line night-line--rest" style="left: {model.selPct}%"></span>
 														{#each group.variants as v, vi (v.variant)}
+															{@const far = v.snapDistance > FAR_SNAP_METERS}
 															<button
 																class="night-stop"
+																class:night-stop--far={far}
 																style="left: {model.pcts[vi]}%"
-																title={v.name}
-																aria-label="Tent spot {v.name}"
+																title={far ? `${v.name} — ${Math.round(v.snapDistance)} m off the route` : v.name}
+																aria-label="Tent spot {v.name}{far ? `, ${Math.round(v.snapDistance)} m off the route` : ''}"
 																onclick={() => selectTentSpot(group.stageNum, v.variant)}
 															>
 																<span class="night-stop-label" class:night-stop-label--active={v.variant === selected}>{group.stageNum}{v.variant}</span>
@@ -582,7 +595,7 @@
 															</button>
 														{/each}
 													</div>
-												{#if dayDelta(stage.day) || (nextStage && dayDelta(nextStage.day))}
+												{#if !isDefaultSpot && (dayDelta(stage.day) || (nextStage && dayDelta(nextStage.day)))}
 														<div class="night-days">
 															<span class="night-day">
 																{#if dayDelta(stage.day)}
@@ -594,6 +607,11 @@
 																	<span class="night-day-delta">{dayDelta(nextStage.day)}</span> Day {nextStage.day} →
 																</span>
 															{/if}
+														</div>
+													{/if}
+													{#if selVariant && selVariant.snapDistance > FAR_SNAP_METERS}
+														<div class="night-warning">
+															! {selVariant.name} is {Math.round(selVariant.snapDistance)} m off the route — the extra way there is not included in the measurements.
 														</div>
 													{/if}
 												</div>
@@ -1208,6 +1226,39 @@
 	.night-stop-dot--active {
 		background: #7EB77F;
 		border-color: #7EB77F;
+	}
+
+	/* Spots far off the route are flagged amber, selected or not —
+	   must come after the base/active rules to win the cascade. */
+	.night-stop--far .night-stop-label {
+		color: rgba(250, 173, 23, 0.65);
+	}
+
+	.night-stop--far:hover .night-stop-label {
+		color: rgba(250, 173, 23, 0.9);
+	}
+
+	.night-stop--far .night-stop-dot {
+		border-color: rgba(250, 173, 23, 0.55);
+	}
+
+	.night-stop--far:hover .night-stop-dot {
+		border-color: rgba(250, 173, 23, 0.9);
+	}
+
+	.night-stop--far .night-stop-label--active {
+		color: #FAAD17;
+	}
+
+	.night-stop--far .night-stop-dot--active {
+		background: #FAAD17;
+		border-color: #FAAD17;
+	}
+
+	.night-warning {
+		margin-top: 4px;
+		font-size: 0.76rem;
+		color: rgba(250, 173, 23, 0.85);
 	}
 
 	.night-days {
