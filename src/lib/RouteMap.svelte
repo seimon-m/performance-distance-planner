@@ -11,8 +11,30 @@
 	let markers = [];
 	let destroyed = false;
 	let mapReady = $state(false);
+	let styleReady = $state(false);
 	let mode = $state('elevation');
 	let showInfo = $state(false);
+
+	// MapLibre never retries errored tiles on its own — a transient tile
+	// failure (throttling, network hiccup) stays blank until the source is
+	// reloaded. Retry a few times with backoff, then give up.
+	const tileRetries = new Map();
+
+	function scheduleTileRetry(sourceId) {
+		const state = tileRetries.get(sourceId) ?? { count: 0, pending: false };
+		if (state.pending || state.count >= 3) return;
+		state.pending = true;
+		state.count += 1;
+		tileRetries.set(sourceId, state);
+		setTimeout(() => {
+			state.pending = false;
+			if (destroyed) return;
+			const source = map?.getSource(sourceId);
+			// setTiles with the same URLs is the public way to force a
+			// re-request of errored tiles on raster sources.
+			if (source?.setTiles && source.tiles) source.setTiles([...source.tiles]);
+		}, 1500 * state.count);
+	}
 
 	onMount(async () => {
 		maplibregl = await import('maplibre-gl');
@@ -49,6 +71,13 @@
 				},
 				layers: [
 					{
+						// Shown wherever imagery tiles are missing or still loading —
+						// without it, gaps expose the page background through the canvas.
+						id: 'background',
+						type: 'background',
+						paint: { 'background-color': '#2a3529' }
+					},
+					{
 						id: 'satellite',
 						type: 'raster',
 						source: 'satellite',
@@ -73,6 +102,10 @@
 
 		map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
 
+		map.on('error', (e) => {
+			if (e.sourceId && e.tile) scheduleTileRetry(e.sourceId);
+		});
+
 		// Markers are DOM overlays independent of the style, so they can be
 		// placed right away — no need to wait for tiles to load.
 		mapReady = true;
@@ -93,7 +126,7 @@
 				'top-right'
 			);
 
-			addRouteLayer();
+			styleReady = true;
 		});
 	});
 
@@ -138,6 +171,11 @@
 		// numbered markers of the selected spots stack above them. They are
 		// purely informational: label always visible, no popup, clicks pass
 		// through to the map.
+		// opacityWhenCovered: '1' keeps spots fully visible even when 3D
+		// terrain occludes them — the default fade to 0.2 also kicks in
+		// wrongly on initial load, before the terrain depth data is ready.
+		const markerOpts = { opacity: '1', opacityWhenCovered: '1' };
+
 		for (const wp of altWaypoints) {
 			const el = document.createElement('div');
 			el.className = 'map-alt-marker';
@@ -146,7 +184,7 @@
 			label.textContent = wp.label ?? wp.name;
 			el.appendChild(label);
 
-			const marker = new maplibregl.Marker({ element: el })
+			const marker = new maplibregl.Marker({ element: el, ...markerOpts })
 				.setLngLat([wp.lon, wp.lat])
 				.addTo(map);
 			markers.push(marker);
@@ -158,7 +196,7 @@
 			el.className = 'map-waypoint-marker';
 			el.textContent = i + 1;
 
-			const marker = new maplibregl.Marker({ element: el })
+			const marker = new maplibregl.Marker({ element: el, ...markerOpts })
 				.setLngLat([wp.lon, wp.lat])
 				.setPopup(new maplibregl.Popup({ offset: 20, closeButton: false }).setText(wp.name))
 				.addTo(map);
@@ -176,8 +214,16 @@
 
 	function switchMode(newMode) {
 		mode = newMode;
-		addRouteLayer();
 	}
+
+	// Rebuild the route layer when the style is ready and whenever the
+	// track (e.g. elevation refetch while the map is open) or the color
+	// mode changes — otherwise the line and the legend drift apart.
+	$effect(() => {
+		track;
+		mode;
+		if (styleReady) addRouteLayer();
+	});
 
 	let legendData = $derived(buildColoredSegments(track, mode).legend);
 	let gradientCSS = $derived(rampToGradient(legendData.ramp));
