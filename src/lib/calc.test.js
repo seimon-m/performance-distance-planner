@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { sortWaypointsAlongTrack, calculateStages, buildStage, computeStages, walkingTime, formatDuration } from './calc.js';
+import { sortWaypointsAlongTrack, calculateStages, buildStage, computeStages, walkingTime, formatDuration, cumulativeDistances } from './calc.js';
+
+describe('cumulativeDistances', () => {
+	it('accumulates geodesic distance along the track', () => {
+		const track = [
+			[8.0, 47.0],
+			[8.01, 47.0],
+			[8.02, 47.0]
+		];
+
+		const cum = cumulativeDistances(track);
+
+		expect(cum[0]).toBe(0);
+		expect(cum[1]).toBeGreaterThan(0);
+		expect(cum[2]).toBeCloseTo(cum[1] * 2, -1);
+	});
+
+	it('handles single-point tracks', () => {
+		expect(cumulativeDistances([[8.0, 47.0]])).toEqual([0]);
+	});
+});
 
 describe('walkingTime', () => {
 	it('uses SAC formula: larger component plus half the smaller', () => {

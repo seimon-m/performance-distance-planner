@@ -22,6 +22,26 @@ export const DEFAULT_ASCENT_RATE = 300; // m of ascent per hour
 export const DEFAULT_DESCENT_RATE = 500; // m of descent per hour
 
 /**
+ * Cumulative geodesic distance (meters) along the track at each point.
+ * cum[0] = 0, cum[last] = total track length.
+ *
+ * @param {Array<[number, number, number?]>} track - [lon, lat, ele?]
+ * @returns {number[]}
+ */
+export function cumulativeDistances(track) {
+	const cum = new Array(track.length).fill(0);
+	for (let i = 1; i < track.length; i++) {
+		cum[i] =
+			cum[i - 1] +
+			getDistance(
+				{ latitude: track[i - 1][1], longitude: track[i - 1][0] },
+				{ latitude: track[i][1], longitude: track[i][0] }
+			);
+	}
+	return cum;
+}
+
+/**
  * Estimate walking time using the SAC/DIN 33466 formula:
  * horizontal time = distance / baseSpeed, vertical time = ascent/ascentRate + descent/descentRate.
  * Total = the larger of the two plus half of the smaller.

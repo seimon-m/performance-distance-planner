@@ -113,7 +113,7 @@
 			</div>
 		</div>
 		<p>
-			Nights with several options get a <strong>⛺ night row</strong> directly in the results table, between the two days the night connects. Picking a different spot moves the split point and updates the day above (↑) and below (↓), with the difference shown against the preferred spot (e.g. "↑ Day 3 +1.3 km / +0:20 h").
+			Nights with several options get a <strong>⛺ night row</strong> directly in the results table, between the two days the night connects. The spots sit on a mini route line at their real position along the track — picking one moves the split point, and each side shows the resulting day (distance and walking time) plus the difference against the preferred spot.
 		</p>
 		<div class="tip">
 			A tent spot only affects where the route is <strong>split</strong> — all measurements still follow the track. If an alternative spot lies off the route (side spur, different valley), the extra way to it is not included; the tool warns when a spot is more than 500 m from the track.
