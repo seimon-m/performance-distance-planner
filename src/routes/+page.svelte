@@ -611,7 +611,7 @@
 													{/if}
 													{#if selVariant && selVariant.snapDistance > FAR_SNAP_METERS}
 														<div class="night-warning">
-															{selVariant.name} is {Math.round(selVariant.snapDistance)} m off the route — not included in the measurements. The detour adds at least {formatDuration((2 * selVariant.snapDistance) / 1000 / app.baseSpeed)} h there and back (straight-line, at your flat speed).
+															{selVariant.name} is {Math.round(selVariant.snapDistance)} m from the route. All measurements follow the track, so the extra way to this spot is not included.
 														</div>
 													{/if}
 												</div>
