@@ -265,7 +265,17 @@
 		});
 		const pcts = spreadPositions(raw);
 		const selIdx = group.variants.findIndex((v) => v.variant === selectedVariantOf(group.stageNum));
-		return { pcts, selPct: pcts[selIdx] ?? 50 };
+
+		// Route distance from the selected spot to each alternative — makes
+		// the proportional geometry readable without having to click around.
+		const selTrackIdx = group.variants[selIdx]?.trackIndex;
+		const deltaKms = group.variants.map((v, vi) => {
+			if (vi === selIdx || selTrackIdx == null) return null;
+			const dKm = (cumDist[v.trackIndex] - cumDist[selTrackIdx]) / 1000;
+			return Math.abs(dKm) < 0.05 ? '±0 km' : `${signed(dKm.toFixed(1))} km`;
+		});
+
+		return { pcts, selPct: pcts[selIdx] ?? 50, deltaKms };
 	}
 
 	// Stages with every night at its preferred spot — the baseline the
@@ -566,6 +576,9 @@
 															>
 																<span class="night-stop-label" class:night-stop-label--active={v.variant === selected}>{group.stageNum}{v.variant}</span>
 																<span class="night-stop-dot" class:night-stop-dot--active={v.variant === selected}></span>
+																{#if model.deltaKms[vi]}
+																	<span class="night-stop-km">{model.deltaKms[vi]}</span>
+																{/if}
 															</button>
 														{/each}
 													</div>
@@ -1099,12 +1112,14 @@
 
 	.night-stops {
 		position: relative;
-		height: 32px;
+		height: 46px;
 	}
 
+	/* Line center sits at 25.5px; the 11px dots at top 20px share that
+	   center exactly — keep both offsets in sync when tuning. */
 	.night-line {
 		position: absolute;
-		top: 20px;
+		top: 24px;
 		height: 3px;
 		border-radius: 2px;
 	}
@@ -1122,11 +1137,9 @@
 	.night-stop {
 		position: absolute;
 		top: 0;
+		bottom: 0;
+		width: 34px;
 		transform: translateX(-50%);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 3px;
 		background: none;
 		border: none;
 		padding: 0;
@@ -1134,6 +1147,10 @@
 	}
 
 	.night-stop-label {
+		position: absolute;
+		top: 0;
+		left: 50%;
+		transform: translateX(-50%);
 		font-size: 0.72rem;
 		line-height: 1;
 		font-family: 'Karla', system-ui, sans-serif;
@@ -1141,6 +1158,23 @@
 		color: rgba(210, 201, 160, 0.55);
 		white-space: nowrap;
 		transition: color 0.15s;
+	}
+
+	.night-stop-km {
+		position: absolute;
+		top: 34px;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 0.68rem;
+		line-height: 1;
+		font-variant-numeric: tabular-nums;
+		color: rgba(210, 201, 160, 0.4);
+		white-space: nowrap;
+		transition: color 0.15s;
+	}
+
+	.night-stop:hover .night-stop-km {
+		color: rgba(210, 201, 160, 0.7);
 	}
 
 	.night-stop:hover .night-stop-label {
@@ -1157,6 +1191,10 @@
 	}
 
 	.night-stop-dot {
+		position: absolute;
+		top: 20px;
+		left: 50%;
+		transform: translateX(-50%);
 		width: 11px;
 		height: 11px;
 		border-radius: 50%;
