@@ -97,7 +97,10 @@
 			fitBoundsOptions: { padding: 40 },
 			pitch: 45,
 			maxPitch: 85,
-			maxZoom: 17
+			maxZoom: 17,
+			// Let tiles from previous zoom levels finish loading during a
+			// fast zoom instead of canceling them — fewer blank patches.
+			cancelPendingTileRequestsWhileZooming: false
 		});
 
 		map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
@@ -119,12 +122,20 @@
 				maxzoom: 15
 			});
 
-			map.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 });
-
 			map.addControl(
 				new maplibregl.TerrainControl({ source: 'terrain-dem', exaggeration: 1.5 }),
 				'top-right'
 			);
+
+			// Enable 3D terrain only once the DEM for the initial view has
+			// loaded — setting it while elevation data is still streaming in
+			// makes the camera jump and zooms snap back to lower levels
+			// (maplibre-gl-js#4688).
+			map.once('idle', () => {
+				if (!destroyed && !map.getTerrain()) {
+					map.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 });
+				}
+			});
 
 			styleReady = true;
 		});
