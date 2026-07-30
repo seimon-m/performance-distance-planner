@@ -71,9 +71,10 @@
 	 * - two stage waypoints snapping to the same track point (stages get merged)
 	 * - waypoints far away from the route (stats around them are unreliable)
 	 *
-	 * Spots on nights with several variants are excluded from the far check —
-	 * they are flagged inline in their night row instead, so toggling spots
-	 * never changes this banner (and never shifts the layout).
+	 * Spots belonging to a stage group are excluded from the far check —
+	 * they are flagged inline in their night row instead, so the warning
+	 * sits at the day it affects and toggling spots never shifts the layout.
+	 * The banner's far check only fires for files without stage groups.
 	 */
 	function checkWaypointNotices(track, waypoints) {
 		if (waypoints.length === 0) return '';
@@ -87,7 +88,7 @@
 		}
 
 		const far = sorted.filter(
-			(wp) => wp.snapDistance > FAR_SNAP_METERS && !variantNightNames.has(wp.name)
+			(wp) => wp.snapDistance > FAR_SNAP_METERS && !stageGroupNames.has(wp.name)
 		);
 		if (far.length > 0) {
 			const names = far.map((wp) => `${wp.name} (${Math.round(wp.snapDistance)} m)`).join(', ');
@@ -193,8 +194,8 @@
 
 	// Nights that have more than one tent spot option
 	let variantNights = $derived(app.stageGroups.filter((g) => g.variants.length > 1));
-	let variantNightNames = $derived(
-		new Set(variantNights.flatMap((g) => g.variants.map((v) => v.name)))
+	let stageGroupNames = $derived(
+		new Set(app.stageGroups.flatMap((g) => g.variants.map((v) => v.name)))
 	);
 
 	// Non-selected tent spot options, shown as ghost markers on the map,
@@ -244,6 +245,17 @@
 		app.currentTrack && app.currentWaypoints?.length
 			? sortWaypointsAlongTrack(app.currentWaypoints, app.currentTrack)
 			: []
+	);
+
+	// Single-spot nights whose tent spot is far off the route, keyed by the
+	// day they follow — flagged inline like variant nights, not in the banner.
+	let farSingleNights = $derived(
+		new Map(
+			app.stageGroups
+				.filter((g) => g.variants.length === 1)
+				.map((g) => [g.stageNum, selectedSnaps.find((wp) => wp.name === g.variants[0].name)])
+				.filter(([, wp]) => wp && wp.snapDistance > FAR_SNAP_METERS)
+		)
 	);
 
 	function snapIndexOf(name) {
@@ -640,6 +652,18 @@
 													{/each}
 												</span>
 											{/if}
+										</div>
+									</td>
+								</tr>
+							{:else if farSingleNights.has(stage.day)}
+								{@const spot = farSingleNights.get(stage.day)}
+								<tr class="night-row" style="--delay: {i * 30}ms">
+									<td colspan="7">
+										<div class="night-row-inner">
+											<span class="night-label">⛺ Night {stage.day}</span>
+											<div class="night-warning night-warning--row">
+												{spot.name} is {Math.round(spot.snapDistance)} m from the route. All measurements follow the track, so the extra way to this spot is not included.
+											</div>
 										</div>
 									</td>
 								</tr>
@@ -1271,6 +1295,10 @@
 		margin-top: 4px;
 		font-size: 0.76rem;
 		color: rgba(250, 173, 23, 0.85);
+	}
+
+	.night-warning--row {
+		margin-top: 0;
 	}
 
 	.night-days {
