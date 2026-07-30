@@ -17,6 +17,7 @@ let currentRawTrack = $state(null);
 let currentWaypoints = $state(null);
 let stageGroups = $state([]);
 let selectedVariants = $state({});
+let parseWarnings = $state([]);
 let dragging = $state(false);
 let elevationProvider = $state(DEFAULT_PROVIDER);
 
@@ -54,6 +55,8 @@ export function getAppState() {
 		set stageGroups(v) { stageGroups = v; },
 		get selectedVariants() { return selectedVariants; },
 		set selectedVariants(v) { selectedVariants = v; },
+		get parseWarnings() { return parseWarnings; },
+		set parseWarnings(v) { parseWarnings = v; },
 		get dragging() { return dragging; },
 		set dragging(v) { dragging = v; },
 		get elevationProvider() { return elevationProvider; },

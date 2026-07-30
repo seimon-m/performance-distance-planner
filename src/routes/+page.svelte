@@ -21,6 +21,7 @@
 		if (!file) return;
 		app.error = '';
 		app.notice = '';
+		app.parseWarnings = [];
 		app.stages = [];
 		showMap = false;
 		app.filename = file.name;
@@ -29,12 +30,13 @@
 		try {
 			app.loadingMessage = 'Parsing file…';
 			const text = await file.text();
-			let { track, waypoints, stageGroups } = parseFile(text, file.name);
+			let { track, waypoints, stageGroups, warnings } = parseFile(text, file.name);
 
 			app.currentRawTrack = track;
 			app.currentWaypoints = waypoints;
 			app.stageGroups = stageGroups;
 			app.selectedVariants = {};
+			app.parseWarnings = warnings;
 
 			if (!hasElevationData(track)) {
 				app.loadingMessage = `Fetching elevation data (${track.length} points)…`;
@@ -50,7 +52,7 @@
 
 			app.currentTrack = fillElevationGaps(track);
 			app.stages = computeStages(app.currentTrack, waypoints, app.ascentDivisor, app.descentDivisor);
-			app.notice = checkWaypointNotices(app.currentTrack, waypoints);
+			app.notice = composeNotice(app.currentTrack, waypoints);
 		} catch (err) {
 			app.error = err.message || 'Error processing file.';
 			app.stages = [];
@@ -99,6 +101,16 @@
 	}
 
 	/**
+	 * The notice banner: warnings from parsing the file (they never change
+	 * after upload) plus the current waypoint checks.
+	 */
+	function composeNotice(track, waypoints) {
+		return [...app.parseWarnings, checkWaypointNotices(track, waypoints)]
+			.filter(Boolean)
+			.join(' ');
+	}
+
+	/**
 	 * Pick a different tent spot for a night and redistribute the two
 	 * adjacent days accordingly.
 	 */
@@ -106,7 +118,7 @@
 		app.selectedVariants = { ...app.selectedVariants, [stageNum]: variant };
 		app.currentWaypoints = selectStageWaypoints(app.stageGroups, app.selectedVariants);
 		recalculate();
-		app.notice = checkWaypointNotices(app.currentTrack, app.currentWaypoints);
+		app.notice = composeNotice(app.currentTrack, app.currentWaypoints);
 	}
 
 	async function refetchElevation(provider) {
