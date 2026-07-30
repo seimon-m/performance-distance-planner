@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterStageWaypoints, compareVariants, groupStageWaypoints, selectStageWaypoints } from './gpx.js';
+import { filterStageWaypoints, compareVariants, groupStageWaypoints, selectStageWaypoints, extractFromGeoJSON } from './gpx.js';
 
 describe('groupStageWaypoints', () => {
 	it('groups variants per night, sorted by priority', () => {
@@ -266,5 +266,115 @@ describe('filterStageWaypoints', () => {
 			'T10.1', 'T10.2', 'T10.3a', 'T10.4a', 'T10.5a',
 			'T10.6', 'T10.7a', 'T10.8', 'T10.9a'
 		]);
+	});
+});
+
+describe('duplicate waypoint names', () => {
+	it('throws a naming error when the same spot name appears twice', () => {
+		const waypoints = [
+			{ name: 'T10.1', lon: 21.0, lat: 39.0 },
+			{ name: 'T10.2', lon: 21.1, lat: 39.1 },
+			{ name: 'T10.2', lon: 21.2, lat: 39.2 }
+		];
+
+		expect(() => groupStageWaypoints(waypoints)).toThrow(/Naming issue: T10\.2 appears 2 times/);
+		expect(() => groupStageWaypoints(waypoints)).toThrow(/Team K&R is happy when you improve the naming :\)/);
+	});
+
+	it('throws when two spellings resolve to the same night and variant', () => {
+		const waypoints = [
+			{ name: 'T10.3a', lon: 21.0, lat: 39.0 },
+			{ name: 'T10.3_A', lon: 21.1, lat: 39.1 }
+		];
+
+		expect(() => groupStageWaypoints(waypoints)).toThrow(/T10\.3a and T10\.3_A name the same spot/);
+	});
+
+	it('lists every clash in one error', () => {
+		const waypoints = [
+			{ name: 'T10.1', lon: 21.0, lat: 39.0 },
+			{ name: 'T10.1', lon: 21.1, lat: 39.1 },
+			{ name: 'T10.4b', lon: 21.2, lat: 39.2 },
+			{ name: 'T10.4b', lon: 21.3, lat: 39.3 }
+		];
+
+		expect(() => groupStageWaypoints(waypoints)).toThrow(/T10\.1 appears 2 times; T10\.4b appears 2 times/);
+	});
+
+	it('does not throw for duplicates outside the detected prefix', () => {
+		const waypoints = [
+			{ name: 'T10.1', lon: 21.0, lat: 39.0 },
+			{ name: 'F10.4', lon: 21.1, lat: 39.1 },
+			{ name: 'F10.4', lon: 21.2, lat: 39.2 }
+		];
+
+		const groups = groupStageWaypoints(waypoints);
+		expect(groups).toHaveLength(1);
+	});
+});
+
+describe('extractFromGeoJSON warnings', () => {
+	function point(name, lon, lat) {
+		return {
+			type: 'Feature',
+			properties: { name },
+			geometry: { type: 'Point', coordinates: [lon, lat] }
+		};
+	}
+
+	function line(name, coordinates) {
+		return {
+			type: 'Feature',
+			properties: { name },
+			geometry: { type: 'LineString', coordinates }
+		};
+	}
+
+	const mainLine = line('Route 0', [[21.0, 39.0, 500], [21.1, 39.1, 520]]);
+
+	it('returns no warnings for a clean single-track file', () => {
+		const { warnings } = extractFromGeoJSON({
+			type: 'FeatureCollection',
+			features: [mainLine, point('T10.1', 21.05, 39.05)]
+		});
+
+		expect(warnings).toEqual([]);
+	});
+
+	it('warns when the file contains several route lines', () => {
+		const { track, warnings } = extractFromGeoJSON({
+			type: 'FeatureCollection',
+			features: [mainLine, line('S10.1', [[22.0, 40.0], [22.1, 40.1]])]
+		});
+
+		expect(track).toHaveLength(2);
+		expect(warnings).toEqual([
+			'The file contains 2 route lines — measurements follow “Route 0” only.'
+		]);
+	});
+
+	it('warns about duplicate names among unused points', () => {
+		const { warnings } = extractFromGeoJSON({
+			type: 'FeatureCollection',
+			features: [
+				mainLine,
+				point('T10.1', 21.05, 39.05),
+				point('F10.4', 21.06, 39.06),
+				point('F10.4', 21.07, 39.07)
+			]
+		});
+
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('F10.4 appears 2 times');
+		expect(warnings[0]).toContain('Team K&R is happy when you improve the naming :)');
+	});
+
+	it('propagates the naming error for stage spot duplicates', () => {
+		const collection = {
+			type: 'FeatureCollection',
+			features: [mainLine, point('T10.1', 21.05, 39.05), point('T10.1', 21.06, 39.06)]
+		};
+
+		expect(() => extractFromGeoJSON(collection)).toThrow(/Naming issue/);
 	});
 });

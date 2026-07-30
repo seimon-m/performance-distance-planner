@@ -6,7 +6,7 @@ import { gpx, kml } from '@tmcw/togeojson';
  *
  * @param {string} fileContent - Raw XML string (GPX or KML)
  * @param {string} filename - Original filename, used for format detection
- * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }> }}
+ * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }>, stageGroups: Array, warnings: string[] }}
  */
 export function parseFile(fileContent, filename) {
 	const ext = filename.split('.').pop()?.toLowerCase();
@@ -22,7 +22,7 @@ export function parseFile(fileContent, filename) {
  * then extract the track coordinates and waypoint positions.
  *
  * @param {string} gpxString - Raw GPX XML string
- * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }> }}
+ * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }>, stageGroups: Array, warnings: string[] }}
  */
 export function parseGPX(gpxString) {
 	const doc = parseXML(gpxString);
@@ -36,7 +36,7 @@ export function parseGPX(gpxString) {
  * KML files preserve elevation data from Google Earth.
  *
  * @param {string} kmlString - Raw KML XML string
- * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }> }}
+ * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }>, stageGroups: Array, warnings: string[] }}
  */
 export function parseKML(kmlString) {
 	const doc = parseXML(kmlString);
@@ -69,15 +69,31 @@ function parseXML(xmlString) {
 /**
  * Extract track and filtered stage waypoints from a GeoJSON FeatureCollection.
  *
+ * Warnings cover situations that are worth knowing but don't block the
+ * calculation — extra route lines the measurement ignores, or duplicate
+ * names among points that aren't used for the stages.
+ *
  * @param {object} geojson - GeoJSON FeatureCollection
- * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }> }}
+ * @returns {{ track: Array<[number, number, number?]>, waypoints: Array<{ name: string, lon: number, lat: number }>, stageGroups: Array, warnings: string[] }}
  */
-function extractFromGeoJSON(geojson) {
+export function extractFromGeoJSON(geojson) {
 	const track = extractTrack(geojson);
 	const allWaypoints = extractWaypoints(geojson);
 
 	if (track.length === 0) {
 		throw new Error('No track found in file.');
+	}
+
+	const warnings = [];
+
+	const lineFeatures = geojson.features.filter(
+		(f) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString'
+	);
+	if (lineFeatures.length > 1) {
+		const used = lineFeatures[0].properties?.name;
+		warnings.push(
+			`The file contains ${lineFeatures.length} route lines — measurements follow ${used ? `“${used}”` : 'the first one'} only.`
+		);
 	}
 
 	// Group stage waypoints by night, keeping all tent spot variants,
@@ -92,7 +108,22 @@ function extractFromGeoJSON(geojson) {
 		waypoints = allWaypoints;
 	}
 
-	return { track, waypoints, stageGroups };
+	// Duplicate names among the remaining points (stage-relevant clashes
+	// already threw in groupStageWaypoints). Harmless for the results, but
+	// easy to mix up when editing the file.
+	const counts = new Map();
+	for (const wp of allWaypoints) {
+		if (wp.name === 'Unnamed') continue;
+		counts.set(wp.name, (counts.get(wp.name) || 0) + 1);
+	}
+	const dupes = [...counts.entries()].filter(([, n]) => n > 1);
+	if (dupes.length > 0) {
+		warnings.push(
+			`${dupes.map(([name, n]) => `${name} appears ${n} times`).join(', ')} in the file — ${dupes.length === 1 ? "this point doesn't" : "these points don't"} affect the stages, but unique names avoid mix-ups. Team K&R is happy when you improve the naming :)`
+		);
+	}
+
+	return { track, waypoints, stageGroups, warnings };
 }
 
 /**
@@ -192,6 +223,33 @@ export function groupStageWaypoints(waypoints) {
 		const { prefix, stageNum, ...variantWp } = wp;
 		if (!groups.has(stageNum)) groups.set(stageNum, []);
 		groups.get(stageNum).push(variantWp);
+	}
+
+	// Two spots resolving to the same night and variant (two "T0.9", or
+	// "T0.9a" next to "T0.9_A") can't be told apart anywhere in the app —
+	// refuse the file with a pointer at the names instead of rendering
+	// a broken table.
+	const clashes = [];
+	for (const variants of groups.values()) {
+		const byVariant = new Map();
+		for (const v of variants) {
+			if (!byVariant.has(v.variant)) byVariant.set(v.variant, []);
+			byVariant.get(v.variant).push(v.name);
+		}
+		for (const names of byVariant.values()) {
+			if (names.length < 2) continue;
+			const unique = [...new Set(names)];
+			clashes.push(
+				unique.length === 1
+					? `${unique[0]} appears ${names.length} times`
+					: `${unique.join(' and ')} name the same spot`
+			);
+		}
+	}
+	if (clashes.length > 0) {
+		throw new Error(
+			`Naming issue: ${clashes.join('; ')}. Every tent spot needs a unique name — alternatives for the same night get a letter (like T0.9a and T0.9b). Fix the names in Google Earth and upload the file again. Team K&R is happy when you improve the naming :)`
+		);
 	}
 
 	return [...groups.entries()]
